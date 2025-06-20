@@ -61,6 +61,7 @@ function gamescopeSplitscreen(){
 
     for (var i = 0; i < gamescopeClients.length; i++){
         gamescopeClients[i].noBorder = true;
+        gamescopeClients[i].keepAbove = true;
         gamescopeClients[i].frameGeometry = {
             x: Xpos[i],
             y: Ypos[i],
