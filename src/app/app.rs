@@ -8,6 +8,8 @@ use crate::util::*;
 
 use dialog::DialogBox;
 use eframe::egui::{self, Key, Ui};
+
+const GAME_ICON_SIZE: f32 = 64.0;
 use std::path::PathBuf;
 
 #[derive(Eq, PartialEq)]
@@ -303,16 +305,18 @@ impl PartyApp {
             ui.horizontal(|ui| {
                 ui.add(
                     egui::Image::new(game.icon())
-                        .max_width(16.0)
-                        .corner_radius(2),
+                        .fit_to_exact_size(egui::vec2(GAME_ICON_SIZE, GAME_ICON_SIZE))
+                        .maintain_aspect_ratio(true),
                 );
-                let btn = ui.selectable_value(&mut self.selected_game, i, game.name());
+                let label = egui::RichText::new(game.name()).size(20.0);
+                let btn = ui.selectable_label(self.selected_game == i, label);
                 if btn.has_focus() {
                     btn.scroll_to_me(None);
                 }
                 if btn.clicked() {
+                    self.selected_game = i;
                     self.cur_page = MenuPage::Game;
-                };
+                }
 
                 let popup_id = ui.make_persistent_id(format!("gamectx{}", i));
 
