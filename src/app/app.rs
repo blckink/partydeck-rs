@@ -789,13 +789,13 @@ fn run_handler_game(
     let status = std::process::Command::new("sh")
         .arg("-c")
         .arg(&cmd)
-        .status()?;
+        .status();
+    kwin_dbus_unload_script()?;
+    remove_guest_profiles()?;
+    let status = status?;
     if !status.success() {
         return Err("Launch command failed".into());
     }
-
-    kwin_dbus_unload_script()?;
-    remove_guest_profiles()?;
 
     Ok(())
 }
@@ -820,12 +820,12 @@ fn run_exec_game(
     let status = std::process::Command::new("sh")
         .arg("-c")
         .arg(&cmd)
-        .status()?;
+        .status();
+    kwin_dbus_unload_script()?;
+    let status = status?;
     if !status.success() {
         return Err("Launch command failed".into());
     }
-
-    kwin_dbus_unload_script()?;
 
     Ok(())
 }
