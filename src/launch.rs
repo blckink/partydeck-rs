@@ -141,7 +141,7 @@ pub fn launch_from_handler<P: PadRef>(
         };
 
         cmd.push_str(&format!(
-            "gamescope -W {gsc_width} -H {gsc_height} {gsc_sdl} -- "
+            "gamescope -f -W {gsc_width} -H {gsc_height} {gsc_sdl} -- "
         ));
         cmd.push_str(&format!(
             "bwrap --die-with-parent --dev-bind / / --tmpfs /tmp "
@@ -285,7 +285,7 @@ pub fn launch_executable<P: PadRef>(
         }
 
         cmd.push_str(&format!(
-            "gamescope -W {gsc_width} -H {gsc_height} --backend=sdl -- "
+            "gamescope -f -W {gsc_width} -H {gsc_height} --backend=sdl -- "
         ));
         cmd.push_str(&format!(
             "bwrap --die-with-parent --dev-bind / / --tmpfs /tmp "

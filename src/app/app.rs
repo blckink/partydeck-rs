@@ -782,13 +782,16 @@ fn run_handler_game(
     };
     kwin_dbus_start_script(PATH_RES.join(script))?;
 
-    std::process::Command::new("sh")
+    let status = std::process::Command::new("sh")
         .arg("-c")
-        .arg(cmd)
-        .status()?;
-
+        .arg(&cmd)
+        .status();
     kwin_dbus_unload_script()?;
     remove_guest_profiles()?;
+    let status = status?;
+    if !status.success() {
+        return Err("Launch command failed".into());
+    }
 
     Ok(())
 }
@@ -810,12 +813,15 @@ fn run_exec_game(
     };
     kwin_dbus_start_script(PATH_RES.join(script))?;
 
-    std::process::Command::new("sh")
+    let status = std::process::Command::new("sh")
         .arg("-c")
-        .arg(cmd)
-        .status()?;
-
+        .arg(&cmd)
+        .status();
     kwin_dbus_unload_script()?;
+    let status = status?;
+    if !status.success() {
+        return Err("Launch command failed".into());
+    }
 
     Ok(())
 }
