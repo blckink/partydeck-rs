@@ -339,8 +339,10 @@ impl PartyApp {
         let mut refresh_games = false;
 
         let available = ui.available_width();
-        let mut columns = ((available + MIN_GAP) / (TILE_SIZE.x + MIN_GAP)).floor() as usize;
-        if columns == 0 {
+let mut columns = ((available + MIN_GAP) / (TILE_SIZE.x + MIN_GAP)).floor() as usize;
+if columns > self.games.len() {
+    columns = self.games.len().max(1);
+}        if columns == 0 {
             columns = 1;
         }
 
