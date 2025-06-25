@@ -239,7 +239,10 @@ impl PartyApp {
             });
         });
     }
+<<<<<<< 58mydu-2025-06-25/refactor-game-grid-layout
 
+=======
+>>>>>>> main
     fn display_info_panel(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("info_panel")
             .exact_height(100.0)
@@ -339,6 +342,7 @@ impl PartyApp {
 
         let mut refresh_games = false;
 
+<<<<<<< 58mydu-2025-06-25/refactor-game-grid-layout
         let available = ui.available_width();
         let mut columns = ((available + MIN_GAP) / (TILE_SIZE.x + MIN_GAP)).floor() as usize;
         if columns == 0 {
@@ -353,11 +357,29 @@ impl PartyApp {
         if gap < MIN_GAP {
             gap = MIN_GAP;
         }
+=======
+let available = ui.available_width();
+let mut columns = ((available + MIN_GAP) / (TILE_SIZE.x + MIN_GAP)).floor() as usize;
+columns = columns.max(1).min(self.games.len());
+
+while columns > 1 {
+    let total_width = columns as f32 * TILE_SIZE.x + (columns + 1) as f32 * MIN_GAP;
+    if total_width <= available {
+        break;
+    }
+    columns -= 1;
+}
+
+let gap = ((available - columns as f32 * TILE_SIZE.x) / (columns + 1) as f32).max(MIN_GAP);
+>>>>>>> main
 
         let mut index = 0usize;
         while index < self.games.len() {
             ui.horizontal(|row| {
+<<<<<<< 58mydu-2025-06-25/refactor-game-grid-layout
                 row.spacing_mut().item_spacing.x = gap;
+=======
+>>>>>>> main
                 row.add_space(gap);
                 for _ in 0..columns {
                     if index >= self.games.len() {
@@ -405,8 +427,15 @@ impl PartyApp {
                         cell.label(game.name());
                     });
                     index += 1;
+<<<<<<< 58mydu-2025-06-25/refactor-game-grid-layout
                 }
                 row.add_space(gap);
+=======
+                    if index < self.games.len() {
+                        row.add_space(gap);
+                    }
+                }
+>>>>>>> main
             });
             ui.add_space(ROW_GAP);
         }
