@@ -264,7 +264,7 @@ impl PartyApp {
         });
         ui.separator();
         egui::ScrollArea::vertical().show(ui, |ui| {
-            self.display_game_list(ui);
+            self.display_game_grid(ui);
         });
     }
 
@@ -354,6 +354,92 @@ impl PartyApp {
             });
         }
         // Hacky workaround to avoid borrowing conflicts from inside the loop
+        if refresh_games {
+            self.games.clear();
+            self.games = scan_all_games();
+        }
+    }
+
+    fn display_game_grid(&mut self, ui: &mut Ui) {
+        const TILE_SIZE: egui::Vec2 = egui::Vec2::new(160.0, 90.0);
+        const MIN_GAP: f32 = 5.0;
+        const ROW_GAP: f32 = 24.0;
+
+        let mut refresh_games = false;
+
+        let available = ui.available_width();
+        let mut columns = ((available + MIN_GAP) / (TILE_SIZE.x + MIN_GAP)).floor() as usize;
+        if columns == 0 {
+            columns = 1;
+        }
+
+        let mut gap = (available - columns as f32 * TILE_SIZE.x) / (columns + 1) as f32;
+        while gap < MIN_GAP && columns > 1 {
+            columns -= 1;
+            gap = (available - columns as f32 * TILE_SIZE.x) / (columns + 1) as f32;
+        }
+        if gap < MIN_GAP {
+            gap = MIN_GAP;
+        }
+
+        let mut index = 0usize;
+        while index < self.games.len() {
+            ui.horizontal(|row| {
+                row.add_space(gap);
+                for _ in 0..columns {
+                    if index >= self.games.len() {
+                        break;
+                    }
+                    let game = &self.games[index];
+                    row.vertical(|cell| {
+                        cell.set_width(TILE_SIZE.x);
+                        let img = egui::ImageButton::new(
+                            egui::Image::new(game.tile_image()).fit_to_exact_size(TILE_SIZE),
+                        )
+                        .corner_radius(4.0);
+                        let resp = cell.add(img);
+                        if resp.clicked() {
+                            self.selected_game = index;
+                            self.cur_page = MenuPage::Game;
+                        }
+                        resp.context_menu(|ui| {
+                            if ui.button("Remove").clicked() {
+                                if yesno(
+                                    "Remove game?",
+                                    &format!("Are you sure you want to remove {}?", game.name()),
+                                ) {
+                                    if let Err(err) = remove_game(game) {
+                                        println!("Failed to remove game: {}", err);
+                                        msg("Error", &format!("Failed to remove game: {}", err));
+                                    }
+                                    refresh_games = true;
+                                }
+                                ui.close_menu();
+                            }
+                            if let HandlerRef(h) = game {
+                                if ui.button("Open Handler Folder").clicked() {
+                                    if let Err(_) = std::process::Command::new("sh")
+                                        .arg("-c")
+                                        .arg(format!("xdg-open {}", h.path_handler.display()))
+                                        .status()
+                                    {
+                                        msg("Error", "Couldn't open handler folder!");
+                                    }
+                                    ui.close_menu();
+                                }
+                            }
+                        });
+                        cell.label(game.name());
+                    });
+                    index += 1;
+                    if index < self.games.len() {
+                        row.add_space(gap);
+                    }
+                }
+            });
+            ui.add_space(ROW_GAP);
+        }
+
         if refresh_games {
             self.games.clear();
             self.games = scan_all_games();
