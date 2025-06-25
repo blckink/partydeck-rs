@@ -16,6 +16,7 @@ pub enum MenuPage {
     Settings,
     Profiles,
     Game,
+    About,
     Players,
 }
 
@@ -76,16 +77,10 @@ impl eframe::App for PartyApp {
             }
             self.display_top_panel(ui);
         });
-        egui::SidePanel::left("games_panel")
-            .resizable(false)
-            .exact_width(200.0)
-            .show(ctx, |ui| {
-                if self.task.is_some() {
-                    ui.disable();
-                }
-                self.display_games_panel(ui);
-            });
-        if (self.cur_page != MenuPage::Main) && (self.cur_page != MenuPage::Players) {
+        if (self.cur_page != MenuPage::Main)
+            && (self.cur_page != MenuPage::Players)
+            && (self.cur_page != MenuPage::About)
+        {
             self.display_info_panel(ctx);
         }
         egui::CentralPanel::default().show(ctx, |ui| {
@@ -107,6 +102,9 @@ impl eframe::App for PartyApp {
                 }
                 MenuPage::Players => {
                     self.display_page_players(ui);
+                }
+                MenuPage::About => {
+                    self.display_page_about(ui);
                 }
             }
         });
@@ -218,6 +216,9 @@ impl PartyApp {
                 self.pads.clear();
                 self.pads = scan_evdev_gamepads();
             }
+            if ui.button("ℹ About").clicked() {
+                self.cur_page = MenuPage::About;
+            }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("❌ Quit").clicked() {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
@@ -238,36 +239,6 @@ impl PartyApp {
             });
         });
     }
-
-    fn display_games_panel(&mut self, ui: &mut Ui) {
-        ui.add_space(6.0);
-        ui.horizontal(|ui| {
-            ui.heading("Games");
-            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                if ui.button("➕").clicked() {
-                    if let Err(err) = add_game() {
-                        println!("Couldn't add game: {err}");
-                        msg("Error", &format!("Couldn't add game: {err}"));
-                    }
-                    let dir_tmp = PATH_PARTY.join("tmp");
-                    if dir_tmp.exists() {
-                        std::fs::remove_dir_all(&dir_tmp).unwrap();
-                    }
-                    self.games.clear();
-                    self.games = crate::game::scan_all_games();
-                }
-                if ui.button("🔄").clicked() {
-                    self.games.clear();
-                    self.games = crate::game::scan_all_games();
-                }
-            });
-        });
-        ui.separator();
-        egui::ScrollArea::vertical().show(ui, |ui| {
-            self.display_game_grid(ui);
-        });
-    }
-
     fn display_info_panel(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("info_panel")
             .exact_height(100.0)
@@ -447,15 +418,28 @@ impl PartyApp {
     }
 
     fn display_page_main(&mut self, ui: &mut Ui) {
-        ui.heading("Welcome to PartyDeck");
+        ui.horizontal(|ui| {
+            if ui.button("➕ Add Game").clicked() {
+                if let Err(err) = add_game() {
+                    println!("Couldn't add game: {err}");
+                    msg("Error", &format!("Couldn't add game: {err}"));
+                }
+                let dir_tmp = PATH_PARTY.join("tmp");
+                if dir_tmp.exists() {
+                    std::fs::remove_dir_all(&dir_tmp).unwrap();
+                }
+                self.games.clear();
+                self.games = scan_all_games();
+            }
+            if ui.button("🔄 Refresh").clicked() {
+                self.games.clear();
+                self.games = scan_all_games();
+            }
+        });
         ui.separator();
-        ui.label("Press SELECT/BACK or Tab to unlock gamepad navigation.");
-        ui.label("PartyDeck is in the very early stages of development; as such, you will likely encounter bugs, issues, and strange design decisions.");
-        ui.label("For debugging purposes, it's recommended to read terminal output (stdout) for further information on errors.");
-        ui.label("If you have found this software useful, consider donating to support further development!");
-        ui.hyperlink_to("Ko-fi", "https://ko-fi.com/wunner");
-        ui.label("If you've encountered issues or want to suggest improvements, criticism and feedback are always appreciated!");
-        ui.hyperlink_to("GitHub", "https://github.com/wunnr/partydeck-rs");
+        egui::ScrollArea::vertical().show(ui, |ui| {
+            self.display_game_grid(ui);
+        });
     }
 
     fn display_page_settings(&mut self, ui: &mut Ui) {
@@ -656,6 +640,18 @@ impl PartyApp {
                     });
                 });
         }
+    }
+
+    fn display_page_about(&mut self, ui: &mut Ui) {
+        ui.heading("Welcome to PartyDeck");
+        ui.separator();
+        ui.label("Press SELECT/BACK or Tab to unlock gamepad navigation.");
+        ui.label("PartyDeck is in the very early stages of development; as such, you will likely encounter bugs, issues, and strange design decisions.");
+        ui.label("For debugging purposes, it's recommended to read terminal output (stdout) for further information on errors.");
+        ui.label("If you have found this software useful, consider donating to support further development!");
+        ui.hyperlink_to("Ko-fi", "https://ko-fi.com/wunner");
+        ui.label("If you've encountered issues or want to suggest improvements, criticism and feedback are always appreciated!");
+        ui.hyperlink_to("GitHub", "https://github.com/wunnr/partydeck-rs");
     }
 
     fn display_page_players(&mut self, ui: &mut Ui) {
