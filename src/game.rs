@@ -42,6 +42,19 @@ impl Game {
             }
         }
     }
+
+    pub fn tile_image(&self) -> ImageSource {
+        match self {
+            Game::Executable { .. } => self.icon(),
+            Game::HandlerRef(handler) => {
+                if let Some(path) = handler.img_paths.first() {
+                    format!("file://{}", path.display()).into()
+                } else {
+                    self.icon()
+                }
+            }
+        }
+    }
 }
 
 pub fn scan_all_games() -> Vec<Game> {
