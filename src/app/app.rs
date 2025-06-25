@@ -338,22 +338,19 @@ impl PartyApp {
 
         let mut refresh_games = false;
 
-        let available = ui.available_width();
+let available = ui.available_width();
 let mut columns = ((available + MIN_GAP) / (TILE_SIZE.x + MIN_GAP)).floor() as usize;
-if columns > self.games.len() {
-    columns = self.games.len().max(1);
-}        if columns == 0 {
-            columns = 1;
-        }
+columns = columns.max(1).min(self.games.len());
 
-        let mut gap = (available - columns as f32 * TILE_SIZE.x) / (columns + 1) as f32;
-        while gap < MIN_GAP && columns > 1 {
-            columns -= 1;
-            gap = (available - columns as f32 * TILE_SIZE.x) / (columns + 1) as f32;
-        }
-        if gap < MIN_GAP {
-            gap = MIN_GAP;
-        }
+while columns > 1 {
+    let total_width = columns as f32 * TILE_SIZE.x + (columns + 1) as f32 * MIN_GAP;
+    if total_width <= available {
+        break;
+    }
+    columns -= 1;
+}
+
+let gap = ((available - columns as f32 * TILE_SIZE.x) / (columns + 1) as f32).max(MIN_GAP);
 
         let mut index = 0usize;
         while index < self.games.len() {
