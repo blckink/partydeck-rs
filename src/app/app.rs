@@ -239,7 +239,6 @@ impl PartyApp {
             });
         });
     }
-
     fn display_info_panel(&mut self, ctx: &egui::Context) {
         egui::TopBottomPanel::bottom("info_panel")
             .exact_height(100.0)
