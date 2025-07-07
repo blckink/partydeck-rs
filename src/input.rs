@@ -1,19 +1,32 @@
 use crate::app::PadFilterType;
+use std::path::Path;
 
 #[derive(Clone)]
 pub struct Player {
+    /// Index of the physical gamepad used to control the UI
     pub pad_index: usize,
+    /// Index of the gamepad that will be exposed to the game
+    pub mask_pad_index: usize,
+    pub mouse_index: Option<usize>,
     pub profname: String,
     pub profselection: usize,
 }
 
 pub fn is_pad_in_players(index: usize, players: &Vec<Player>) -> bool {
     for player in players {
-        if player.pad_index == index {
+        if player.pad_index == index || player.mask_pad_index == index {
             return true;
         }
     }
     false
+}
+
+fn parse_event_num(path: &str) -> u32 {
+    Path::new(path)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .and_then(|s| s.trim_start_matches("event").parse().ok())
+        .unwrap_or(0)
 }
 
 use evdev::*;
@@ -22,6 +35,30 @@ pub struct Gamepad {
     path: String,
     dev: Device,
     enabled: bool,
+    event_num: u32,
+    phys: String,
+}
+
+pub struct Mouse {
+    path: String,
+    dev: Device,
+    event_num: u32,
+    phys: String,
+}
+
+impl Mouse {
+    pub fn name(&self) -> &str {
+        self.dev.name().unwrap_or_else(|| "")
+    }
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+    pub fn event_num(&self) -> u32 {
+        self.event_num
+    }
+    pub fn phys(&self) -> &str {
+        &self.phys
+    }
 }
 pub enum PadButton {
     Left,
@@ -50,6 +87,12 @@ impl Gamepad {
     }
     pub fn path(&self) -> &str {
         &self.path
+    }
+    pub fn event_num(&self) -> u32 {
+        self.event_num
+    }
+    pub fn phys(&self) -> &str {
+        &self.phys
     }
     pub fn poll(&mut self) -> Option<PadButton> {
         let mut btn: Option<PadButton> = None;
@@ -96,19 +139,24 @@ pub fn scan_evdev_gamepads(filter: &PadFilterType) -> Vec<Gamepad> {
             PadFilterType::NoSteamInput => dev.1.input_id().vendor() != 0x28de,
             PadFilterType::OnlySteamInput => dev.1.input_id().vendor() == 0x28de,
         };
+        let vendor = dev.1.input_id().vendor();
         let has_btn_south = dev
             .1
             .supported_keys()
             .map_or(false, |keys| keys.contains(KeyCode::BTN_SOUTH));
-        if has_btn_south {
+        if has_btn_south || vendor == 0x28de {
             if dev.1.set_nonblocking(true).is_err() {
                 println!("Failed to set non-blocking mode for {}", dev.0.display());
                 continue;
             }
+            let path = dev.0.to_str().unwrap().to_string();
+            let phys = dev.1.physical_path().unwrap_or("").to_string();
             pads.push(Gamepad {
-                path: dev.0.to_str().unwrap().to_string(),
+                event_num: parse_event_num(&path),
+                path,
                 dev: dev.1,
                 enabled,
+                phys,
             });
         }
     }
@@ -117,20 +165,29 @@ pub fn scan_evdev_gamepads(filter: &PadFilterType) -> Vec<Gamepad> {
 }
 
 #[allow(dead_code)]
-pub fn scan_evdev_mice() -> Vec<Device> {
-    let mut mice: Vec<Device> = Vec::new();
+pub fn scan_evdev_mice() -> Vec<Mouse> {
+    let mut mice: Vec<Mouse> = Vec::new();
     for dev in evdev::enumerate() {
+        let vendor = dev.1.input_id().vendor();
         let has_btn_left = dev
             .1
             .supported_keys()
             .map_or(false, |keys| keys.contains(KeyCode::BTN_LEFT));
-        if has_btn_left {
+        if has_btn_left || vendor == 0x28de {
             if dev.1.set_nonblocking(true).is_err() {
                 println!("Failed to set non-blocking mode for {}", dev.0.display());
                 continue;
             }
-            mice.push(dev.1);
+            let path = dev.0.to_str().unwrap().to_string();
+            let phys = dev.1.physical_path().unwrap_or("").to_string();
+            mice.push(Mouse {
+                event_num: parse_event_num(&path),
+                path,
+                dev: dev.1,
+                phys,
+            });
         }
     }
+    mice.sort_by_key(|m| m.path.clone());
     mice
 }

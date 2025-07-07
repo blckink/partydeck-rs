@@ -13,10 +13,19 @@ pub struct PadInfo {
     pub enabled: bool,
 }
 
+#[derive(Clone)]
+pub struct MouseInfo {
+    pub path: String,
+}
+
 pub trait PadRef {
     fn path(&self) -> &str;
     fn vendor(&self) -> u16;
     fn enabled(&self) -> bool;
+}
+
+pub trait MouseRef {
+    fn path(&self) -> &str;
 }
 
 impl PadRef for Gamepad {
@@ -43,9 +52,22 @@ impl PadRef for PadInfo {
     }
 }
 
-pub fn launch_from_handler<P: PadRef>(
+impl MouseRef for Mouse {
+    fn path(&self) -> &str {
+        self.path()
+    }
+}
+
+impl MouseRef for MouseInfo {
+    fn path(&self) -> &str {
+        &self.path
+    }
+}
+
+pub fn launch_from_handler<P: PadRef, M: MouseRef>(
     h: &Handler,
     all_pads: &[P],
+    all_mice: &[M],
     players: &Vec<Player>,
     cfg: &PartyConfig,
 ) -> Result<String, Box<dyn std::error::Error>> {
@@ -193,8 +215,15 @@ pub fn launch_from_handler<P: PadRef>(
         }
         // Mask out any gamepads that aren't this player's
         for (i, pad) in all_pads.iter().enumerate() {
-            if !pad.enabled() || p.pad_index != i {
+            if !pad.enabled() || p.mask_pad_index != i {
                 let path = pad.path();
+                binds.push_str(&format!("--bind /dev/null {path} "));
+            }
+        }
+        // Mask out any mice that aren't this player's
+        for (i, mouse) in all_mice.iter().enumerate() {
+            if p.mouse_index != Some(i) {
+                let path = mouse.path();
                 binds.push_str(&format!("--bind /dev/null {path} "));
             }
         }
@@ -228,9 +257,10 @@ pub fn launch_from_handler<P: PadRef>(
     Ok(cmd)
 }
 
-pub fn launch_executable<P: PadRef>(
+pub fn launch_executable<P: PadRef, M: MouseRef>(
     exec_path: &PathBuf,
     all_pads: &[P],
+    all_mice: &[M],
     players: &Vec<Player>,
     cfg: &PartyConfig,
 ) -> Result<String, Box<dyn std::error::Error>> {
@@ -304,8 +334,15 @@ pub fn launch_executable<P: PadRef>(
 
         // Mask out any gamepads that aren't this player's
         for (i, pad) in all_pads.iter().enumerate() {
-            if pad.vendor() == 0x28de || p.pad_index != i {
+            if p.mask_pad_index != i {
                 let path = pad.path();
+                binds.push_str(&format!("--bind /dev/null {path} "));
+            }
+        }
+        // Mask out any mice that aren't this player's
+        for (i, mouse) in all_mice.iter().enumerate() {
+            if p.mouse_index != Some(i) {
+                let path = mouse.path();
                 binds.push_str(&format!("--bind /dev/null {path} "));
             }
         }
