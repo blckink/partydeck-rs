@@ -2,7 +2,7 @@ use crate::app::config::*;
 use crate::game::{Game::*, *};
 use crate::handler::*;
 use crate::input::*;
-use crate::launch::{PadInfo, MouseInfo, launch_executable, launch_from_handler};
+use crate::launch::{MouseInfo, PadInfo, launch_executable, launch_from_handler};
 use crate::paths::*;
 use crate::util::*;
 
@@ -222,6 +222,7 @@ impl PartyApp {
                 self.players.clear();
                 self.pads.clear();
                 self.pads = scan_evdev_gamepads(&self.options.pad_filter_type);
+                self.mice = scan_evdev_mice();
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("❌ Quit").clicked() {
@@ -442,6 +443,7 @@ impl PartyApp {
             if r1.clicked() || r2.clicked() || r3.clicked() {
                 self.pads.clear();
                 self.pads = scan_evdev_gamepads(&self.options.pad_filter_type);
+                self.mice = scan_evdev_mice();
             }
         });
 
@@ -545,6 +547,7 @@ impl PartyApp {
                 };
                 self.pads.clear();
                 self.pads = scan_evdev_gamepads(&self.options.pad_filter_type);
+                self.mice = scan_evdev_mice();
             }
         });
     }
@@ -689,8 +692,29 @@ impl PartyApp {
                 } else {
                     ui.label(format!("Player {}", i + 1));
                 }
-                ui.label(format!("🎮 {}", self.pads[player.pad_index].fancyname(),));
-                ui.small(format!("({})", self.pads[player.pad_index].path(),));
+                ui.label("🎮");
+                let mut pad_sel = player.mask_pad_index;
+                egui::ComboBox::from_id_salt(format!("pad_{i}")).show_index(
+                    ui,
+                    &mut pad_sel,
+                    self.pads.len(),
+                    |idx| self.pads[idx].fancyname().to_string(),
+                );
+                if pad_sel != player.mask_pad_index {
+                    player.mask_pad_index = pad_sel;
+                    if self.pads[pad_sel].vendor() == 0x28de {
+                        if let Some(phys) = self.pads.iter().position(|p| {
+                            p.event_num() == self.pads[pad_sel].event_num() && p.vendor() != 0x28de
+                        }) {
+                            player.pad_index = phys;
+                        } else {
+                            player.pad_index = pad_sel;
+                        }
+                    } else {
+                        player.pad_index = pad_sel;
+                    }
+                }
+                ui.small(format!("({})", self.pads[player.mask_pad_index].path(),));
                 let mut mouse_sel = player.mouse_index.map(|x| x + 1).unwrap_or(0);
                 egui::ComboBox::from_id_salt(format!("mouse_{i}")).show_index(
                     ui,
@@ -704,7 +728,11 @@ impl PartyApp {
                         }
                     },
                 );
-                player.mouse_index = if mouse_sel == 0 { None } else { Some(mouse_sel - 1) };
+              player.mouse_index = if mouse_sel == 0 {
+                    None
+                } else {
+                    Some(mouse_sel - 1)
+                };
                 if ui.button("❌").clicked() {
                     remove_player = true;
                 }
@@ -776,15 +804,25 @@ impl PartyApp {
 
     fn handle_gamepad_players(&mut self) {
         for (i, pad) in self.pads.iter_mut().enumerate() {
-            if !pad.enabled() || is_pad_in_players(i, &self.players) {
+            if is_pad_in_players(i, &self.players) {
                 continue;
             }
             match pad.poll() {
                 Some(PadButton::ABtn) => {
                     if self.players.len() < 4 {
+                        let mask_idx = self
+                            .pads
+                            .iter()
+                            .position(|p| p.event_num() == pad.event_num() && p.vendor() == 0x28de)
+                            .unwrap_or(i);
+                        let mouse_idx = self
+                            .mice
+                            .iter()
+                            .position(|m| m.event_num() == self.pads[mask_idx].event_num());
                         self.players.push(Player {
                             pad_index: i,
-                            mouse_index: None,
+                            mask_pad_index: mask_idx,
+                            mouse_index: mouse_idx,
                             profname: String::new(),
                             profselection: 0,
                         });
@@ -854,8 +892,7 @@ impl PartyApp {
                     pad_infos.clone(),
                     mouse_infos.clone(),
                     cfg.clone(),
-                )
-                {
+                ) {
                     println!("{}", err);
                     msg("Launch Error", &format!("{err}"));
                 }

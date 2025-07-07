@@ -215,7 +215,7 @@ pub fn launch_from_handler<P: PadRef, M: MouseRef>(
         }
         // Mask out any gamepads that aren't this player's
         for (i, pad) in all_pads.iter().enumerate() {
-            if !pad.enabled() || p.pad_index != i {
+            if !pad.enabled() || p.mask_pad_index != i {
                 let path = pad.path();
                 binds.push_str(&format!("--bind /dev/null {path} "));
             }
@@ -334,7 +334,7 @@ pub fn launch_executable<P: PadRef, M: MouseRef>(
 
         // Mask out any gamepads that aren't this player's
         for (i, pad) in all_pads.iter().enumerate() {
-            if pad.vendor() == 0x28de || p.pad_index != i {
+            if pad.vendor() == 0x28de || p.mask_pad_index != i {
                 let path = pad.path();
                 binds.push_str(&format!("--bind /dev/null {path} "));
             }
