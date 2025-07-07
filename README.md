@@ -22,6 +22,7 @@ A split-screen game launcher for Linux/SteamOS
 - Steam multiplayer API is emulated, allowing for multiple instances of Steam games
 - Works with most game controllers without any additional setup, drivers, or third-party software
 - Uses sandboxing software to mask out controllers so that each game instance only detects the controller assigned to it, preventing input interference
+- Supports assigning individual mice or Steam Input trackpads to each player (Steam Input trackpads may appear as duplicate devices)
 - Profile support allows each player to have their own persistent save data, settings, and stats for games
 - Works out of the box on SteamOS
 
@@ -45,6 +46,10 @@ On first launch, the app will automatically download UMU Launcher and Goldberg S
 
 Once in the main menu, click the + button to add a handler. Create profiles if you want to store save data, and have a look through the settings menu.
 
+### Using Steam Input
+
+When Steam Input is enabled, each physical controller is listed twice on the Players page: once as the normal device and once as the "Steam Input" device. Both entries share the same `/dev/input/eventXX` number. To pass Steam Input to the game, add a player by pressing the A button on the physical controller. The launcher will automatically select the matching Steam Input controller and trackpad using that number. You can change the assignment at any time from the player dropdowns.
+
 ## Building
 
 You'll need a Rust toolchain installed with the 2024 Edition. Clone the repo, and run `build.sh`. This will place the executable, as well as the relevant data files, into the "build" folder.
@@ -64,7 +69,7 @@ PartyDeck uses a few software layers to provide a console-like split-screen gami
 ## Known Issues, Limitations and To-dos
 
 - AppImages and Flatpaks are not supported yet for native Linux games. Handlers can only run regular executables inside folders.
-- "Console-like splitscreen experience" means single-screen and controllers only. Multi-monitor support is possible but will require a better understanding of the KWin Scripting API. Support for multiple keyboards and mice is also theoretically possible, but I'll have to look into how I would go about implementing it.
+- "Console-like splitscreen experience" means single-screen and controllers only. Multi-monitor support is possible but will require a better understanding of the KWin Scripting API. Multiple mice are now supported through evdev or Steam Input trackpads, but Steam Input may create duplicate mouse devices. Support for multiple keyboards is still unimplemented.
 - The launcher is built synchronously, meaning there isn't any visual indicators of progress or loading when things are happening, it will just freeze up. This obviously isn't ideal.
 - Controller navigation support in the launcher is super primitive; I'd love to try making a more controller-friendly, Big-Picture-style UI in the future, but have no immediate plans for it.
 - Games using Goldberg might have trouble discovering LAN games from other devices. If this happens, you can try adding a firewall rule for port 47584. If connecting two Steam Decks through LAN, their hostnames should be changed from the default "steamdeck".
