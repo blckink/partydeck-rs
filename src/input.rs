@@ -80,6 +80,26 @@ impl Gamepad {
             _ => self.name(),
         }
     }
+
+    /// Returns a more descriptive name for display purposes.
+    /// Steam Input devices will attempt to show the underlying controller type.
+    pub fn display_name(&self, pads: &[Gamepad]) -> String {
+        let base = self.fancyname();
+        let name = if self.vendor() == 0x28de {
+            let prod = self.dev.input_id().product();
+            if let Some(p) = pads
+                .iter()
+                .find(|p| p.dev.input_id().product() == prod && p.vendor() != 0x28de)
+            {
+                format!("{base} for {}", p.fancyname())
+            } else {
+                base.to_string()
+            }
+        } else {
+            base.to_string()
+        };
+        format!("{name} (event{})", self.event_num)
+    }
     pub fn path(&self) -> &str {
         &self.path
     }

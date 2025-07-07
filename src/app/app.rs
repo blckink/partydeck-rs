@@ -647,7 +647,7 @@ impl PartyApp {
         for pad in self.pads.iter() {
             ui.add_enabled(
                 pad.enabled(),
-                egui::Label::new(format!("🎮 {} ({})", pad.fancyname(), pad.path())),
+                egui::Label::new(format!("🎮 {}", pad.display_name(&self.pads))),
             );
         }
 
@@ -698,7 +698,7 @@ impl PartyApp {
                     ui,
                     &mut pad_sel,
                     self.pads.len(),
-                    |idx| self.pads[idx].fancyname().to_string(),
+                    |idx| self.pads[idx].display_name(&self.pads),
                 );
                 if pad_sel != player.mask_pad_index {
                     player.mask_pad_index = pad_sel;
