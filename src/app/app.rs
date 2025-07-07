@@ -728,7 +728,7 @@ impl PartyApp {
                         }
                     },
                 );
-                player.mouse_index = if mouse_sel == 0 {
+              player.mouse_index = if mouse_sel == 0 {
                     None
                 } else {
                     Some(mouse_sel - 1)

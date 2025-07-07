@@ -55,6 +55,20 @@ impl Mouse {
         self.event_num
     }
 }
+
+pub struct Mouse {
+    path: String,
+    dev: Device,
+}
+
+impl Mouse {
+    pub fn name(&self) -> &str {
+        self.dev.name().unwrap_or_else(|| "")
+    }
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+}
 pub enum PadButton {
     Left,
     Right,
@@ -167,8 +181,7 @@ pub fn scan_evdev_mice() -> Vec<Mouse> {
             if dev.1.set_nonblocking(true).is_err() {
                 println!("Failed to set non-blocking mode for {}", dev.0.display());
                 continue;
-            }
-            let path = dev.0.to_str().unwrap().to_string();
+            }            let path = dev.0.to_str().unwrap().to_string();
             mice.push(Mouse {
                 event_num: parse_event_num(&path),
                 path,
