@@ -810,28 +810,73 @@ impl PartyApp {
             if is_pad_in_players(i, &self.players) {
                 continue;
             }
-            let (btn, phys, uniq) = {
+            let (btn, phys, uniq, evnum) = {
                 let pad = &mut self.pads[i];
-                (pad.poll(), pad.phys().to_string(), pad.uniq().to_string())
+                (
+                    pad.poll(),
+                    pad.phys().to_string(),
+                    pad.uniq().to_string(),
+                    pad.event_num(),
+                )
             };
             match btn {
                 Some(PadButton::ABtn) => {
                     if self.players.len() < 4 {
-                        let mask_idx = self
+                        let mut mask_candidates: Vec<(usize, u32)> = self
                             .pads
                             .iter()
-                            .position(|p| {
+                            .enumerate()
+                            .filter(|(_, p)| {
                                 p.vendor() == 0x28de
-                                    && (p.phys() == phys || (!uniq.is_empty() && p.uniq() == uniq))
+                                    && (p.phys() == phys
+                                        || (!uniq.is_empty() && p.uniq() == uniq))
                             })
+                            .map(|(idx, p)| (idx, p.event_num()))
+                            .collect();
+                        let mut avail: Vec<(usize, u32)> = mask_candidates
+                            .iter()
+                            .cloned()
+                            .filter(|(idx, _)| {
+                                !self.players.iter().any(|pl| pl.mask_pad_index == *idx)
+                            })
+                            .collect();
+                        if avail.is_empty() {
+                            avail = mask_candidates.clone();
+                        }
+                        let mask_idx = avail
+                            .into_iter()
+                            .min_by_key(|(_, e)| (e.abs_diff(evnum)))
+                            .map(|(idx, _)| idx)
                             .unwrap_or(i);
-                        let mouse_idx = self
+
+                        let mut mouse_candidates: Vec<(usize, u32)> = self
                             .mice
                             .iter()
-                            .position(|m| {
+                            .enumerate()
+                            .filter(|(_, m)| {
                                 m.phys() == self.pads[mask_idx].phys()
-                                    || (!uniq.is_empty() && m.uniq() == self.pads[mask_idx].uniq())
-                            });
+                                    || (!self.pads[mask_idx].uniq().is_empty()
+                                        && m.uniq() == self.pads[mask_idx].uniq())
+                            })
+                            .map(|(idx, m)| (idx, m.event_num()))
+                            .collect();
+                        let mut m_avail: Vec<(usize, u32)> = mouse_candidates
+                            .iter()
+                            .cloned()
+                            .filter(|(idx, _)| {
+                                !self.players.iter().any(|pl| pl.mouse_index == Some(*idx))
+                            })
+                            .collect();
+                        if m_avail.is_empty() {
+                            m_avail = mouse_candidates.clone();
+                        }
+                        let mouse_idx = m_avail
+                            .into_iter()
+                            .min_by_key(|(_, e)| {
+                                e.abs_diff(self.pads[mask_idx].event_num())
+                            })
+                            .map(|(idx, _)| idx);
+
                         self.players.push(Player {
                             pad_index: i,
                             mask_pad_index: mask_idx,
