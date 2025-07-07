@@ -647,7 +647,7 @@ impl PartyApp {
         for pad in self.pads.iter() {
             ui.add_enabled(
                 pad.enabled(),
-                egui::Label::new(format!("🎮 {} ({})", pad.fancyname(), pad.path())),
+                egui::Label::new(format!("🎮 {}", pad.display_name(&self.pads))),
             );
         }
 
