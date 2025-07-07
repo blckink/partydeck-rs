@@ -111,11 +111,12 @@ pub fn scan_evdev_gamepads(filter: &PadFilterType) -> Vec<Gamepad> {
             PadFilterType::NoSteamInput => dev.1.input_id().vendor() != 0x28de,
             PadFilterType::OnlySteamInput => dev.1.input_id().vendor() == 0x28de,
         };
+        let vendor = dev.1.input_id().vendor();
         let has_btn_south = dev
             .1
             .supported_keys()
             .map_or(false, |keys| keys.contains(KeyCode::BTN_SOUTH));
-        if has_btn_south {
+        if has_btn_south || vendor == 0x28de {
             if dev.1.set_nonblocking(true).is_err() {
                 println!("Failed to set non-blocking mode for {}", dev.0.display());
                 continue;
@@ -135,11 +136,12 @@ pub fn scan_evdev_gamepads(filter: &PadFilterType) -> Vec<Gamepad> {
 pub fn scan_evdev_mice() -> Vec<Mouse> {
     let mut mice: Vec<Mouse> = Vec::new();
     for dev in evdev::enumerate() {
+        let vendor = dev.1.input_id().vendor();
         let has_btn_left = dev
             .1
             .supported_keys()
             .map_or(false, |keys| keys.contains(KeyCode::BTN_LEFT));
-        if has_btn_left {
+        if has_btn_left || vendor == 0x28de {
             if dev.1.set_nonblocking(true).is_err() {
                 println!("Failed to set non-blocking mode for {}", dev.0.display());
                 continue;
