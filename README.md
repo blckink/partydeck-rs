@@ -46,6 +46,10 @@ On first launch, the app will automatically download UMU Launcher and Goldberg S
 
 Once in the main menu, click the + button to add a handler. Create profiles if you want to store save data, and have a look through the settings menu.
 
+### Using Steam Input
+
+When Steam Input is enabled, each physical controller is listed twice on the Players page: once as the normal device and once as the "Steam Input" device. Both entries share the same `/dev/input/eventXX` number. To pass Steam Input to the game, add a player by pressing the A button on the physical controller. The launcher will automatically select the matching Steam Input controller and trackpad using that number. You can change the assignment at any time from the player dropdowns.
+
 ## Building
 
 You'll need a Rust toolchain installed with the 2024 Edition. Clone the repo, and run `build.sh`. This will place the executable, as well as the relevant data files, into the "build" folder.
