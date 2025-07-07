@@ -37,6 +37,7 @@ pub struct Gamepad {
     enabled: bool,
     event_num: u32,
     phys: String,
+    uniq: String,
 }
 
 pub struct Mouse {
@@ -44,6 +45,7 @@ pub struct Mouse {
     dev: Device,
     event_num: u32,
     phys: String,
+    uniq: String,
 }
 
 impl Mouse {
@@ -58,6 +60,9 @@ impl Mouse {
     }
     pub fn phys(&self) -> &str {
         &self.phys
+    }
+    pub fn uniq(&self) -> &str {
+        &self.uniq
     }
 }
 pub enum PadButton {
@@ -113,6 +118,9 @@ impl Gamepad {
     }
     pub fn phys(&self) -> &str {
         &self.phys
+    }
+    pub fn uniq(&self) -> &str {
+        &self.uniq
     }
     pub fn poll(&mut self) -> Option<PadButton> {
         let mut btn: Option<PadButton> = None;
@@ -171,12 +179,14 @@ pub fn scan_evdev_gamepads(filter: &PadFilterType) -> Vec<Gamepad> {
             }
             let path = dev.0.to_str().unwrap().to_string();
             let phys = dev.1.physical_path().unwrap_or("").to_string();
+            let uniq = dev.1.unique_name().unwrap_or("").to_string();
             pads.push(Gamepad {
                 event_num: parse_event_num(&path),
                 path,
                 dev: dev.1,
                 enabled,
                 phys,
+                uniq,
             });
         }
     }
@@ -200,11 +210,13 @@ pub fn scan_evdev_mice() -> Vec<Mouse> {
             }
             let path = dev.0.to_str().unwrap().to_string();
             let phys = dev.1.physical_path().unwrap_or("").to_string();
+            let uniq = dev.1.unique_name().unwrap_or("").to_string();
             mice.push(Mouse {
                 event_num: parse_event_num(&path),
                 path,
                 dev: dev.1,
                 phys,
+                uniq,
             });
         }
     }
