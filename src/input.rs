@@ -36,12 +36,14 @@ pub struct Gamepad {
     dev: Device,
     enabled: bool,
     event_num: u32,
+    phys: String,
 }
 
 pub struct Mouse {
     path: String,
     dev: Device,
     event_num: u32,
+    phys: String,
 }
 
 impl Mouse {
@@ -53,6 +55,9 @@ impl Mouse {
     }
     pub fn event_num(&self) -> u32 {
         self.event_num
+    }
+    pub fn phys(&self) -> &str {
+        &self.phys
     }
 }
 pub enum PadButton {
@@ -105,6 +110,9 @@ impl Gamepad {
     }
     pub fn event_num(&self) -> u32 {
         self.event_num
+    }
+    pub fn phys(&self) -> &str {
+        &self.phys
     }
     pub fn poll(&mut self) -> Option<PadButton> {
         let mut btn: Option<PadButton> = None;
@@ -162,11 +170,13 @@ pub fn scan_evdev_gamepads(filter: &PadFilterType) -> Vec<Gamepad> {
                 continue;
             }
             let path = dev.0.to_str().unwrap().to_string();
+            let phys = dev.1.physical_path().unwrap_or("").to_string();
             pads.push(Gamepad {
                 event_num: parse_event_num(&path),
                 path,
                 dev: dev.1,
                 enabled,
+                phys,
             });
         }
     }
@@ -189,10 +199,12 @@ pub fn scan_evdev_mice() -> Vec<Mouse> {
                 continue;
             }
             let path = dev.0.to_str().unwrap().to_string();
+            let phys = dev.1.physical_path().unwrap_or("").to_string();
             mice.push(Mouse {
                 event_num: parse_event_num(&path),
                 path,
                 dev: dev.1,
+                phys,
             });
         }
     }

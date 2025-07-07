@@ -47,8 +47,7 @@ On first launch, the app will automatically download UMU Launcher and Goldberg S
 Once in the main menu, click the + button to add a handler. Create profiles if you want to store save data, and have a look through the settings menu.
 
 ### Using Steam Input
-
-When Steam Input is enabled, each physical controller is listed twice on the Players page: once as the normal device and once as the "Steam Input" device. Both entries share the same `/dev/input/eventXX` number. To pass Steam Input to the game, add a player by pressing the A button on the physical controller. The launcher will automatically select the matching Steam Input controller and trackpad using that number. You can change the assignment at any time from the player dropdowns.
+When Steam Input is enabled, each physical controller appears twice on the Players page: once as the regular device and once as the Steam Input device. The launcher matches them using the underlying physical path, so adding a player with the A button on the real controller automatically selects the correct Steam Input controller and trackpad. You can adjust the assignment at any time from the player dropdowns.
 
 ## Building
 

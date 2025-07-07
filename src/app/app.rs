@@ -698,13 +698,13 @@ impl PartyApp {
                     ui,
                     &mut pad_sel,
                     self.pads.len(),
-                    |idx| self.pads[idx].display_name(&self.pads),
+                    |idx| self.pads[idx].fancyname().to_string(),
                 );
                 if pad_sel != player.mask_pad_index {
                     player.mask_pad_index = pad_sel;
                     if self.pads[pad_sel].vendor() == 0x28de {
                         if let Some(phys) = self.pads.iter().position(|p| {
-                            p.event_num() == self.pads[pad_sel].event_num() && p.vendor() != 0x28de
+                            p.phys() == self.pads[pad_sel].phys() && p.vendor() != 0x28de
                         }) {
                             player.pad_index = phys;
                         } else {
@@ -807,9 +807,9 @@ impl PartyApp {
             if is_pad_in_players(i, &self.players) {
                 continue;
             }
-            let (btn, event_num) = {
+            let (btn, phys) = {
                 let pad = &mut self.pads[i];
-                (pad.poll(), pad.event_num())
+                (pad.poll(), pad.phys().to_string())
             };
             match btn {
                 Some(PadButton::ABtn) => {
@@ -817,12 +817,12 @@ impl PartyApp {
                         let mask_idx = self
                             .pads
                             .iter()
-                            .position(|p| p.event_num() == event_num && p.vendor() == 0x28de)
+                            .position(|p| p.phys() == phys && p.vendor() == 0x28de)
                             .unwrap_or(i);
                         let mouse_idx = self
                             .mice
                             .iter()
-                            .position(|m| m.event_num() == self.pads[mask_idx].event_num());
+                            .position(|m| m.phys() == self.pads[mask_idx].phys());
                         self.players.push(Player {
                             pad_index: i,
                             mask_pad_index: mask_idx,
