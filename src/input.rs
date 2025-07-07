@@ -3,6 +3,7 @@ use crate::app::PadFilterType;
 #[derive(Clone)]
 pub struct Player {
     pub pad_index: usize,
+    pub mouse_index: Option<usize>,
     pub profname: String,
     pub profselection: usize,
 }
@@ -22,6 +23,20 @@ pub struct Gamepad {
     path: String,
     dev: Device,
     enabled: bool,
+}
+
+pub struct Mouse {
+    path: String,
+    dev: Device,
+}
+
+impl Mouse {
+    pub fn name(&self) -> &str {
+        self.dev.name().unwrap_or_else(|| "")
+    }
+    pub fn path(&self) -> &str {
+        &self.path
+    }
 }
 pub enum PadButton {
     Left,
@@ -96,11 +111,12 @@ pub fn scan_evdev_gamepads(filter: &PadFilterType) -> Vec<Gamepad> {
             PadFilterType::NoSteamInput => dev.1.input_id().vendor() != 0x28de,
             PadFilterType::OnlySteamInput => dev.1.input_id().vendor() == 0x28de,
         };
+        let vendor = dev.1.input_id().vendor();
         let has_btn_south = dev
             .1
             .supported_keys()
             .map_or(false, |keys| keys.contains(KeyCode::BTN_SOUTH));
-        if has_btn_south {
+        if has_btn_south || vendor == 0x28de {
             if dev.1.set_nonblocking(true).is_err() {
                 println!("Failed to set non-blocking mode for {}", dev.0.display());
                 continue;
@@ -117,20 +133,25 @@ pub fn scan_evdev_gamepads(filter: &PadFilterType) -> Vec<Gamepad> {
 }
 
 #[allow(dead_code)]
-pub fn scan_evdev_mice() -> Vec<Device> {
-    let mut mice: Vec<Device> = Vec::new();
+pub fn scan_evdev_mice() -> Vec<Mouse> {
+    let mut mice: Vec<Mouse> = Vec::new();
     for dev in evdev::enumerate() {
+        let vendor = dev.1.input_id().vendor();
         let has_btn_left = dev
             .1
             .supported_keys()
             .map_or(false, |keys| keys.contains(KeyCode::BTN_LEFT));
-        if has_btn_left {
+        if has_btn_left || vendor == 0x28de {
             if dev.1.set_nonblocking(true).is_err() {
                 println!("Failed to set non-blocking mode for {}", dev.0.display());
                 continue;
             }
-            mice.push(dev.1);
+            mice.push(Mouse {
+                path: dev.0.to_str().unwrap().to_string(),
+                dev: dev.1,
+            });
         }
     }
+    mice.sort_by_key(|m| m.path.clone());
     mice
 }

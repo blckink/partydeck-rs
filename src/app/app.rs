@@ -2,7 +2,7 @@ use crate::app::config::*;
 use crate::game::{Game::*, *};
 use crate::handler::*;
 use crate::input::*;
-use crate::launch::{PadInfo, launch_executable, launch_from_handler};
+use crate::launch::{PadInfo, MouseInfo, launch_executable, launch_from_handler};
 use crate::paths::*;
 use crate::util::*;
 
@@ -25,6 +25,7 @@ pub struct PartyApp {
     pub cur_page: MenuPage,
     pub infotext: String,
     pub pads: Vec<Gamepad>,
+    pub mice: Vec<Mouse>,
     pub players: Vec<Player>,
     pub games: Vec<Game>,
     pub profiles: Vec<String>,
@@ -45,12 +46,14 @@ impl Default for PartyApp {
     fn default() -> Self {
         let opts = load_cfg();
         let pads = scan_evdev_gamepads(&opts.pad_filter_type);
+        let mice = scan_evdev_mice();
         Self {
             needs_update: check_for_partydeck_update(),
             options: opts,
             cur_page: MenuPage::Main,
             infotext: String::new(),
             pads,
+            mice,
             players: Vec::new(),
             games: scan_all_games(),
             profiles: Vec::new(),
@@ -647,6 +650,15 @@ impl PartyApp {
 
         ui.separator();
 
+        ui.heading("Mice / Trackpads");
+        ui.separator();
+
+        for mouse in self.mice.iter() {
+            ui.label(format!("🖱 {} ({})", mouse.name(), mouse.path()));
+        }
+
+        ui.separator();
+
         ui.heading("Players");
         ui.separator();
 
@@ -662,7 +674,9 @@ impl PartyApp {
         });
 
         let mut i = 0;
-        for player in &mut self.players {
+        while i < self.players.len() {
+            let mut remove_player = false;
+            let player = &mut self.players[i];
             ui.horizontal(|ui| {
                 ui.label("👤");
                 if let HandlerRef(_) = cur_game!(self) {
@@ -677,8 +691,29 @@ impl PartyApp {
                 }
                 ui.label(format!("🎮 {}", self.pads[player.pad_index].fancyname(),));
                 ui.small(format!("({})", self.pads[player.pad_index].path(),));
+                let mut mouse_sel = player.mouse_index.map(|x| x + 1).unwrap_or(0);
+                egui::ComboBox::from_id_salt(format!("mouse_{i}")).show_index(
+                    ui,
+                    &mut mouse_sel,
+                    self.mice.len() + 1,
+                    |idx| {
+                        if idx == 0 {
+                            "No Mouse".to_string()
+                        } else {
+                            self.mice[idx - 1].name().to_string()
+                        }
+                    },
+                );
+                player.mouse_index = if mouse_sel == 0 { None } else { Some(mouse_sel - 1) };
+                if ui.button("❌").clicked() {
+                    remove_player = true;
+                }
             });
-            i += 1;
+            if remove_player {
+                self.players.remove(i);
+            } else {
+                i += 1;
+            }
         }
         if self.players.len() > 0 {
             ui.separator();
@@ -749,6 +784,7 @@ impl PartyApp {
                     if self.players.len() < 4 {
                         self.players.push(Player {
                             pad_index: i,
+                            mouse_index: None,
                             profname: String::new(),
                             profselection: 0,
                         });
@@ -801,19 +837,31 @@ impl PartyApp {
                 enabled: p.enabled(),
             })
             .collect();
+        let mouse_infos: Vec<MouseInfo> = self
+            .mice
+            .iter()
+            .map(|m| MouseInfo {
+                path: m.path().to_string(),
+            })
+            .collect();
         let cfg = self.options.clone();
         self.cur_page = MenuPage::Main;
         self.spawn_task("Launching...", move || match game {
             HandlerRef(handler) => {
-                if let Err(err) =
-                    run_handler_game(handler, players.clone(), pad_infos.clone(), cfg.clone())
+                if let Err(err) = run_handler_game(
+                    handler,
+                    players.clone(),
+                    pad_infos.clone(),
+                    mouse_infos.clone(),
+                    cfg.clone(),
+                )
                 {
                     println!("{}", err);
                     msg("Launch Error", &format!("{err}"));
                 }
             }
             Executable { path, .. } => {
-                if let Err(err) = run_exec_game(path, players, pad_infos, cfg) {
+                if let Err(err) = run_exec_game(path, players, pad_infos, mouse_infos, cfg) {
                     println!("{}", err);
                     msg("Launch Error", &format!("{err}"));
                 }
@@ -832,6 +880,7 @@ fn run_handler_game(
     handler: Handler,
     players: Vec<Player>,
     pad_infos: Vec<PadInfo>,
+    mouse_infos: Vec<MouseInfo>,
     cfg: PartyConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let _ = save_cfg(&cfg);
@@ -844,7 +893,7 @@ fn run_handler_game(
         create_symlink_folder(&handler)?;
     }
 
-    let cmd = launch_from_handler(&handler, &pad_infos, &players, &cfg)?;
+    let cmd = launch_from_handler(&handler, &pad_infos, &mouse_infos, &players, &cfg)?;
     println!("\nCOMMAND:\n{}\n", cmd);
 
     if cfg.enable_kwin_script {
@@ -875,11 +924,12 @@ fn run_exec_game(
     path: PathBuf,
     players: Vec<Player>,
     pad_infos: Vec<PadInfo>,
+    mouse_infos: Vec<MouseInfo>,
     cfg: PartyConfig,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let _ = save_cfg(&cfg);
 
-    let cmd = launch_executable(&path, &pad_infos, &players, &cfg)?;
+    let cmd = launch_executable(&path, &pad_infos, &mouse_infos, &players, &cfg)?;
 
     let script = if players.len() == 2 && cfg.vertical_two_player {
         "splitscreen_kwin_vertical.js"
