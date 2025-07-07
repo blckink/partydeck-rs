@@ -728,7 +728,7 @@ impl PartyApp {
                         }
                     },
                 );
-              player.mouse_index = if mouse_sel == 0 {
+                player.mouse_index = if mouse_sel == 0 {
                     None
                 } else {
                     Some(mouse_sel - 1)
@@ -803,17 +803,21 @@ impl PartyApp {
     }
 
     fn handle_gamepad_players(&mut self) {
-        for (i, pad) in self.pads.iter_mut().enumerate() {
+        for i in 0..self.pads.len() {
             if is_pad_in_players(i, &self.players) {
                 continue;
             }
-            match pad.poll() {
+            let (btn, event_num) = {
+                let pad = &mut self.pads[i];
+                (pad.poll(), pad.event_num())
+            };
+            match btn {
                 Some(PadButton::ABtn) => {
                     if self.players.len() < 4 {
                         let mask_idx = self
                             .pads
                             .iter()
-                            .position(|p| p.event_num() == pad.event_num() && p.vendor() == 0x28de)
+                            .position(|p| p.event_num() == event_num && p.vendor() == 0x28de)
                             .unwrap_or(i);
                         let mouse_idx = self
                             .mice
@@ -829,7 +833,7 @@ impl PartyApp {
                     }
                 }
                 Some(PadButton::BBtn) => {
-                    if self.players.len() == 0 {
+                    if self.players.is_empty() {
                         self.cur_page = MenuPage::Main;
                     }
                 }
