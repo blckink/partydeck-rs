@@ -24,8 +24,8 @@ pub fn spawn_dualsense_mice() -> Vec<DualSenseMouse> {
             continue;
         }
         let path = match info.path().to_str() {
-            Some(p) => p.to_string(),
-            None => continue,
+            Ok(p) => p.to_string(),
+            Err(_) => continue,
         };
         let mut ds = DualSense::new_path(&path);
         let name = format!("pd-dualsense-mouse-{}", index);
