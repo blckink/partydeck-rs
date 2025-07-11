@@ -46,7 +46,7 @@ impl Default for PartyApp {
     fn default() -> Self {
         let opts = load_cfg();
         let pads = scan_evdev_gamepads(&opts.pad_filter_type);
-        let mice = scan_evdev_mice();
+        let mice = scan_evdev_mice(&opts.pad_filter_type);
         Self {
             needs_update: check_for_partydeck_update(),
             options: opts,
@@ -222,7 +222,7 @@ impl PartyApp {
                 self.players.clear();
                 self.pads.clear();
                 self.pads = scan_evdev_gamepads(&self.options.pad_filter_type);
-                self.mice = scan_evdev_mice();
+                self.mice = scan_evdev_mice(&self.options.pad_filter_type);
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 if ui.button("❌ Quit").clicked() {
@@ -443,7 +443,7 @@ impl PartyApp {
             if r1.clicked() || r2.clicked() || r3.clicked() {
                 self.pads.clear();
                 self.pads = scan_evdev_gamepads(&self.options.pad_filter_type);
-                self.mice = scan_evdev_mice();
+                self.mice = scan_evdev_mice(&self.options.pad_filter_type);
             }
         });
 
@@ -547,7 +547,7 @@ impl PartyApp {
                 };
                 self.pads.clear();
                 self.pads = scan_evdev_gamepads(&self.options.pad_filter_type);
-                self.mice = scan_evdev_mice();
+                self.mice = scan_evdev_mice(&self.options.pad_filter_type);
             }
         });
     }
@@ -641,24 +641,32 @@ impl PartyApp {
     }
 
     fn display_page_players(&mut self, ui: &mut Ui) {
-        ui.heading("Controllers");
+        ui.columns(2, |cols| {
+            cols[0].heading("Controllers / Mice");
+            cols[1].heading("Steam Input");
+            cols[0].separator();
+            cols[1].separator();
+
+            for pad in self.pads.iter() {
+                let label = egui::Label::new(format!("🎮 {}", pad.display_name(&self.pads)));
+                if pad.vendor() == 0x28de {
+                    cols[1].add_enabled(pad.enabled(), label);
+                } else {
+                    cols[0].add_enabled(pad.enabled(), label);
+                }
+            }
+
+            for mouse in self.mice.iter() {
+                let label = egui::Label::new(format!("🖱 {} ({})", mouse.name(), mouse.path()));
+                if mouse.vendor() == 0x28de {
+                    cols[1].add_enabled(mouse.enabled(), label);
+                } else {
+                    cols[0].add_enabled(mouse.enabled(), label);
+                }
+            }
+        });
+
         ui.separator();
-
-        for pad in self.pads.iter() {
-            ui.add_enabled(
-                pad.enabled(),
-                egui::Label::new(format!("🎮 {}", pad.display_name(&self.pads))),
-            );
-        }
-
-        ui.separator();
-
-        ui.heading("Mice / Trackpads");
-        ui.separator();
-
-        for mouse in self.mice.iter() {
-            ui.label(format!("🖱 {} ({})", mouse.name(), mouse.path()));
-        }
 
         ui.separator();
 
@@ -807,31 +815,79 @@ impl PartyApp {
 
     fn handle_gamepad_players(&mut self) {
         for i in 0..self.pads.len() {
-            if is_pad_in_players(i, &self.players) {
+            if is_pad_in_players(i, &self.players) || !self.pads[i].enabled() {
                 continue;
             }
-            let (btn, phys, uniq) = {
+            let (btn, phys, uniq, evnum) = {
                 let pad = &mut self.pads[i];
-                (pad.poll(), pad.phys().to_string(), pad.uniq().to_string())
+                (
+                    pad.poll(),
+                    pad.phys().to_string(),
+                    pad.uniq().to_string(),
+                    pad.event_num(),
+                )
             };
             match btn {
                 Some(PadButton::ABtn) => {
                     if self.players.len() < 4 {
-                        let mask_idx = self
+                        let mut mask_candidates: Vec<(usize, u32)> = self
                             .pads
                             .iter()
-                            .position(|p| {
+                            .enumerate()
+                            .filter(|(_, p)| {
                                 p.vendor() == 0x28de
-                                    && (p.phys() == phys || (!uniq.is_empty() && p.uniq() == uniq))
+                                    && p.enabled()
+                                    && (p.phys() == phys
+                                        || (!uniq.is_empty() && p.uniq() == uniq))
                             })
+                            .map(|(idx, p)| (idx, p.event_num()))
+                            .collect();
+                        let mut avail: Vec<(usize, u32)> = mask_candidates
+                            .iter()
+                            .cloned()
+                            .filter(|(idx, _)| {
+                                !self.players.iter().any(|pl| pl.mask_pad_index == *idx)
+                            })
+                            .collect();
+                        if avail.is_empty() {
+                            avail = mask_candidates.clone();
+                        }
+                        let mask_idx = avail
+                            .into_iter()
+                            .min_by_key(|(_, e)| (e.abs_diff(evnum)))
+                            .map(|(idx, _)| idx)
                             .unwrap_or(i);
-                        let mouse_idx = self
+
+                        let mut mouse_candidates: Vec<(usize, u32)> = self
                             .mice
                             .iter()
-                            .position(|m| {
-                                m.phys() == self.pads[mask_idx].phys()
-                                    || (!uniq.is_empty() && m.uniq() == self.pads[mask_idx].uniq())
-                            });
+                            .enumerate()
+                            .filter(|(_, m)| {
+                                m.vendor() == 0x28de
+                                    && m.enabled()
+                                    && (m.phys() == self.pads[mask_idx].phys()
+                                        || (!self.pads[mask_idx].uniq().is_empty()
+                                            && m.uniq() == self.pads[mask_idx].uniq()))
+                            })
+                            .map(|(idx, m)| (idx, m.event_num()))
+                            .collect();
+                        let mut m_avail: Vec<(usize, u32)> = mouse_candidates
+                            .iter()
+                            .cloned()
+                            .filter(|(idx, _)| {
+                                !self.players.iter().any(|pl| pl.mouse_index == Some(*idx))
+                            })
+                            .collect();
+                        if m_avail.is_empty() {
+                            m_avail = mouse_candidates.clone();
+                        }
+                        let mouse_idx = m_avail
+                            .into_iter()
+                            .min_by_key(|(_, e)| {
+                                e.abs_diff(self.pads[mask_idx].event_num())
+                            })
+                            .map(|(idx, _)| idx);
+
                         self.players.push(Player {
                             pad_index: i,
                             mask_pad_index: mask_idx,
@@ -893,6 +949,7 @@ impl PartyApp {
             .iter()
             .map(|m| MouseInfo {
                 path: m.path().to_string(),
+                name: m.name().to_string(),
             })
             .collect();
         let cfg = self.options.clone();
@@ -946,6 +1003,8 @@ fn run_handler_game(
     let cmd = launch_from_handler(&handler, &pad_infos, &mouse_infos, &players, &cfg)?;
     println!("\nCOMMAND:\n{}\n", cmd);
 
+    auto_assign_mice(players.clone(), mouse_infos.clone());
+
     if cfg.enable_kwin_script {
         let script = if players.len() == 2 && cfg.vertical_two_player {
             "splitscreen_kwin_vertical.js"
@@ -980,6 +1039,8 @@ fn run_exec_game(
     let _ = save_cfg(&cfg);
 
     let cmd = launch_executable(&path, &pad_infos, &mouse_infos, &players, &cfg)?;
+
+    auto_assign_mice(players.clone(), mouse_infos.clone());
 
     let script = if players.len() == 2 && cfg.vertical_two_player {
         "splitscreen_kwin_vertical.js"

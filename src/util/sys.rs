@@ -1,6 +1,8 @@
 use dialog::{Choice, DialogBox};
 use std::error::Error;
 use std::path::PathBuf;
+
+use crate::input::{Player, MouseInfo};
 use x11rb::connection::Connection;
 
 pub fn msg(title: &str, contents: &str) {
@@ -117,4 +119,62 @@ pub fn kwin_dbus_unload_script() -> Result<(), Box<dyn Error>> {
 
     println!("Script unloaded.");
     Ok(())
+}
+
+pub fn assign_pointer(win_id: &str, device: &str) -> Result<(), Box<dyn Error>> {
+    let name = format!("pd-{device}");
+    let check = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(format!("xinput list | grep -q '{name} pointer'"))
+        .status()?;
+    if !check.success() {
+        let _ = std::process::Command::new("xinput")
+            .arg("create-master")
+            .arg(&name)
+            .status();
+    }
+
+    let id_out = std::process::Command::new("sh")
+        .arg("-c")
+        .arg(format!("xinput list --id-only \"{device}\" 2>/dev/null"))
+        .output()?;
+    let id = String::from_utf8_lossy(&id_out.stdout).trim().to_string();
+    if !id.is_empty() {
+        let _ = std::process::Command::new("xinput")
+            .args(["reattach", &id, &format!("{name} pointer")])
+            .status();
+        if !win_id.is_empty() {
+            let _ = std::process::Command::new("xinput")
+                .args(["set-cp", win_id, &format!("{name} pointer")])
+                .status();
+        }
+    }
+    Ok(())
+}
+
+pub fn auto_assign_mice(players: Vec<Player>, mice: Vec<MouseInfo>) {
+    std::thread::spawn(move || {
+        use std::time::Duration;
+        for _ in 0..20 {
+            let out = std::process::Command::new("xdotool")
+                .args(["search", "--class", "gamescope"])
+                .output();
+            if let Ok(out) = out {
+                let mut wins: Vec<String> =
+                    String::from_utf8_lossy(&out.stdout).lines().map(|s| s.to_string()).collect();
+                wins.sort();
+                if wins.len() >= players.len() {
+                    for (i, player) in players.iter().enumerate() {
+                        if let Some(idx) = player.mouse_index {
+                            if let Some(m) = mice.get(idx) {
+                                let _ = assign_pointer(&wins[i], &m.name);
+                            }
+                        }
+                    }
+                    break;
+                }
+            }
+            std::thread::sleep(Duration::from_millis(500));
+        }
+    });
 }

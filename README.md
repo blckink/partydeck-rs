@@ -47,7 +47,7 @@ On first launch, the app will automatically download UMU Launcher and Goldberg S
 Once in the main menu, click the + button to add a handler. Create profiles if you want to store save data, and have a look through the settings menu.
 
 ### Using Steam Input
-When Steam Input is enabled, each physical controller appears twice on the Players page: once as the regular device and once as the Steam Input device. The launcher matches them using the underlying device path or unique ID, so adding a player with the A button on the real controller automatically selects the correct Steam Input controller and trackpad. You can adjust the assignment at any time from the player dropdowns.
+When Steam Input is enabled, each controller shows up twice on the Players page: once for the physical device and once for the Steam Input version. The launcher now pairs them more reliably. If both the physical path and unique ID are identical for multiple controllers, the event number is used to match them one‑to‑one. Steam Input devices are listed in a separate column so you can easily see which devices are virtual. This prevents trackpads from being mismatched and ensures each player only controls their own instance. You can still change the assignments from the dropdowns if needed.
 
 ## Building
 
@@ -68,7 +68,7 @@ PartyDeck uses a few software layers to provide a console-like split-screen gami
 ## Known Issues, Limitations and To-dos
 
 - AppImages and Flatpaks are not supported yet for native Linux games. Handlers can only run regular executables inside folders.
-- "Console-like splitscreen experience" means single-screen and controllers only. Multi-monitor support is possible but will require a better understanding of the KWin Scripting API. Multiple mice are now supported through evdev or Steam Input trackpads, but Steam Input may create duplicate mouse devices. Support for multiple keyboards is still unimplemented.
+ - "Console-like splitscreen experience" means single-screen and controllers only. Multi-monitor support is possible but will require a better understanding of the KWin Scripting API. Multiple mice are now supported through evdev or Steam Input trackpads. Pointers are automatically locked to their windows when the game launches, so no extra setup is required. Support for multiple keyboards is still unimplemented.
 - The launcher is built synchronously, meaning there isn't any visual indicators of progress or loading when things are happening, it will just freeze up. This obviously isn't ideal.
 - Controller navigation support in the launcher is super primitive; I'd love to try making a more controller-friendly, Big-Picture-style UI in the future, but have no immediate plans for it.
 - Games using Goldberg might have trouble discovering LAN games from other devices. If this happens, you can try adding a firewall rule for port 47584. If connecting two Steam Decks through LAN, their hostnames should be changed from the default "steamdeck".
