@@ -2,7 +2,8 @@ use dialog::{Choice, DialogBox};
 use std::error::Error;
 use std::path::PathBuf;
 
-use crate::input::{Player, MouseInfo};
+use crate::input::Player;
+use crate::launch::MouseInfo;
 use x11rb::connection::Connection;
 
 pub fn msg(title: &str, contents: &str) {
