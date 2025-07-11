@@ -50,23 +50,20 @@ pub fn spawn_dualsense_mice() -> Vec<DualSenseMouse> {
         let pos = Arc::new(Mutex::new((0u16, 0u16)));
         let pos_x = pos.clone();
         let pos_y = pos.clone();
-        let cbx: &'static _ = Box::leak(Box::new(move |x| {
+        ds.on_touchpad1_x_changed(&move |x| {
             let mut p = pos_x.lock().unwrap();
             let dx = x as i32 - p.0 as i32;
             p.0 = x;
             let _ = ui_x.lock().unwrap().position(&Position::X, dx);
             let _ = ui_x.lock().unwrap().synchronize();
-        }));
-        ds.on_touchpad1_x_changed(cbx);
-        let cby: &'static _ = Box::leak(Box::new(move |y| {
-
+        });
+        ds.on_touchpad1_y_changed(&move |y| {
             let mut p = pos_y.lock().unwrap();
             let dy = y as i32 - p.1 as i32;
             p.1 = y;
             let _ = ui_y.lock().unwrap().position(&Position::Y, dy);
             let _ = ui_y.lock().unwrap().synchronize();
-        }));
-        ds.on_touchpad1_y_changed(cby);
+        });
         let handle = ds.run();
         out.push(DualSenseMouse {
             name,
