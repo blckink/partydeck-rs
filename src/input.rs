@@ -30,7 +30,7 @@ fn parse_event_num(path: &str) -> u32 {
 }
 
 use evdev::*;
-use evdev::enums::AbsoluteAxisType;
+use evdev::AbsoluteAxisCode;
 
 pub struct Gamepad {
     path: String,
@@ -90,13 +90,20 @@ impl Gamepad {
     pub fn name(&self) -> &str {
         self.dev.name().unwrap_or_else(|| "")
     }
-    pub fn fancyname(&self) -> &str {
+    pub fn fancyname(&self) -> String {
         match self.dev.input_id().vendor() {
-            0x045e => "Xbox Controller",
-            0x054c => "PS Controller",
-            0x057e => "NT Pro Controller",
-            0x28de => "Steam Input",
-            _ => self.name(),
+            0x045e => "Xbox Controller".to_string(),
+            0x054c => {
+                let name = self.name().to_ascii_lowercase();
+                if name.contains("dualsense") {
+                    "DualSense Controller".to_string()
+                } else {
+                    "PS Controller".to_string()
+                }
+            }
+            0x057e => "NT Pro Controller".to_string(),
+            0x28de => "Steam Input".to_string(),
+            _ => self.name().to_string(),
         }
     }
 
@@ -110,14 +117,14 @@ impl Gamepad {
                 .iter()
                 .find(|p| p.dev.input_id().product() == prod && p.vendor() != 0x28de)
             {
-                format!("{base} for {}", p.fancyname())
+                format!("{} for {}", base, p.fancyname())
             } else {
-                base.to_string()
+                base
             }
         } else {
-            base.to_string()
+            base
         };
-        format!("{name} (event{})", self.event_num)
+        format!("{} (event{})", name, self.event_num)
     }
     pub fn path(&self) -> &str {
         &self.path
@@ -221,8 +228,8 @@ pub fn scan_evdev_mice(filter: &PadFilterType) -> Vec<Mouse> {
             .1
             .supported_absolute_axes()
             .map_or(false, |abs| {
-                abs.contains(AbsoluteAxisType::ABS_MT_POSITION_X)
-                    && abs.contains(AbsoluteAxisType::ABS_MT_POSITION_Y)
+                abs.contains(AbsoluteAxisCode::ABS_MT_POSITION_X)
+                    && abs.contains(AbsoluteAxisCode::ABS_MT_POSITION_Y)
             });
         if has_btn_left || vendor == 0x28de || has_touch {
             if dev.1.set_nonblocking(true).is_err() {

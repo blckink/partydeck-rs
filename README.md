@@ -73,22 +73,6 @@ PartyDeck uses a few software layers to provide a console-like split-screen gami
 - Controller navigation support in the launcher is super primitive; I'd love to try making a more controller-friendly, Big-Picture-style UI in the future, but have no immediate plans for it.
 - Games using Goldberg might have trouble discovering LAN games from other devices. If this happens, you can try adding a firewall rule for port 47584. If connecting two Steam Decks through LAN, their hostnames should be changed from the default "steamdeck".
 
-## Troubleshooting Input
-
-PartyDeck reads controllers through the standard `evdev` interface. Most devices
-expose an `/dev/input/event*` node when the correct kernel driver is loaded.
-If your controller only shows up as `hidraw` and no event device appears, the
-launcher will not detect it. Make sure the appropriate driver (such as
-`hid-playstation` for PS5 pads) is loaded and check `/dev/input/` again.
-You can load the driver with `sudo modprobe hid-playstation` on kernels that
-include it. Updating your kernel or enabling the module may be necessary on some
-distributions.
-
-DualSense controllers expose their touchpads through this driver as a separate
-input device. If the touchpad only responds while holding the PS button, ensure
-that the `hid-playstation` module is loaded and that no user-space daemon is
-grabbing the device. Reconnecting the controller after loading the module
-usually resolves this issue.
 
 ## Credits/Thanks
 

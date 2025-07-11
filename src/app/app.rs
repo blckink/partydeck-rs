@@ -706,7 +706,7 @@ impl PartyApp {
                     ui,
                     &mut pad_sel,
                     self.pads.len(),
-                    |idx| self.pads[idx].fancyname().to_string(),
+                    |idx| self.pads[idx].fancyname(),
                 );
                 if pad_sel != player.mask_pad_index {
                     player.mask_pad_index = pad_sel;
