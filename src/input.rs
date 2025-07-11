@@ -30,6 +30,7 @@ fn parse_event_num(path: &str) -> u32 {
 }
 
 use evdev::*;
+use evdev::enums::AbsoluteAxisType;
 
 pub struct Gamepad {
     path: String,
@@ -216,7 +217,14 @@ pub fn scan_evdev_mice(filter: &PadFilterType) -> Vec<Mouse> {
             .1
             .supported_keys()
             .map_or(false, |keys| keys.contains(KeyCode::BTN_LEFT));
-        if has_btn_left || vendor == 0x28de {
+        let has_touch = dev
+            .1
+            .supported_absolute_axes()
+            .map_or(false, |abs| {
+                abs.contains(AbsoluteAxisType::ABS_MT_POSITION_X)
+                    && abs.contains(AbsoluteAxisType::ABS_MT_POSITION_Y)
+            });
+        if has_btn_left || vendor == 0x28de || has_touch {
             if dev.1.set_nonblocking(true).is_err() {
                 println!("Failed to set non-blocking mode for {}", dev.0.display());
                 continue;

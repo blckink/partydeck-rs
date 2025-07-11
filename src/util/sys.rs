@@ -122,8 +122,9 @@ pub fn kwin_dbus_unload_script() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-pub fn assign_pointer(win_id: &str, device: &str) -> Result<(), Box<dyn Error>> {
-    let name = format!("pd-{device}");
+pub fn assign_pointer(win_id: &str, mouse: &MouseInfo) -> Result<(), Box<dyn Error>> {
+    let sanitized = mouse.path.replace('/', "_").replace('.', "_");
+    let name = format!("pd-{sanitized}");
     let check = std::process::Command::new("sh")
         .arg("-c")
         .arg(format!("xinput list | grep -q '{name} pointer'"))
@@ -137,9 +138,17 @@ pub fn assign_pointer(win_id: &str, device: &str) -> Result<(), Box<dyn Error>> 
 
     let id_out = std::process::Command::new("sh")
         .arg("-c")
-        .arg(format!("xinput list --id-only \"{device}\" 2>/dev/null"))
+        .arg(format!(
+            "xinput list --id-only \"{}\" 2>/dev/null",
+            mouse.name
+        ))
         .output()?;
-    let id = String::from_utf8_lossy(&id_out.stdout).trim().to_string();
+    let id = String::from_utf8_lossy(&id_out.stdout)
+        .lines()
+        .next()
+        .unwrap_or("")
+        .trim()
+        .to_string();
     if !id.is_empty() {
         let _ = std::process::Command::new("xinput")
             .args(["reattach", &id, &format!("{name} pointer")])
@@ -161,14 +170,16 @@ pub fn auto_assign_mice(players: Vec<Player>, mice: Vec<MouseInfo>) {
                 .args(["search", "--class", "gamescope"])
                 .output();
             if let Ok(out) = out {
-                let mut wins: Vec<String> =
-                    String::from_utf8_lossy(&out.stdout).lines().map(|s| s.to_string()).collect();
+                let mut wins: Vec<String> = String::from_utf8_lossy(&out.stdout)
+                    .lines()
+                    .map(|s| s.to_string())
+                    .collect();
                 wins.sort();
                 if wins.len() >= players.len() {
                     for (i, player) in players.iter().enumerate() {
                         if let Some(idx) = player.mouse_index {
                             if let Some(m) = mice.get(idx) {
-                                let _ = assign_pointer(&wins[i], &m.name);
+                                let _ = assign_pointer(&wins[i], m);
                             }
                         }
                     }

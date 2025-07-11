@@ -830,7 +830,7 @@ impl PartyApp {
             match btn {
                 Some(PadButton::ABtn) => {
                     if self.players.len() < 4 {
-                        let mut mask_candidates: Vec<(usize, u32)> = self
+                        let mask_candidates: Vec<(usize, u32)> = self
                             .pads
                             .iter()
                             .enumerate()
@@ -858,7 +858,7 @@ impl PartyApp {
                             .map(|(idx, _)| idx)
                             .unwrap_or(i);
 
-                        let mut mouse_candidates: Vec<(usize, u32)> = self
+                        let mouse_candidates: Vec<(usize, u32)> = self
                             .mice
                             .iter()
                             .enumerate()
