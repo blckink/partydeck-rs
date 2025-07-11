@@ -59,6 +59,7 @@ pub fn spawn_dualsense_mice() -> Vec<DualSenseMouse> {
         }));
         ds.on_touchpad1_x_changed(cbx);
         let cby: &'static _ = Box::leak(Box::new(move |y| {
+
             let mut p = pos_y.lock().unwrap();
             let dy = y as i32 - p.1 as i32;
             p.1 = y;
