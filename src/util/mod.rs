@@ -13,7 +13,7 @@ pub use filesystem::{SanitizePath, copy_dir_recursive, get_rootpath, get_rootpat
 // Re-export functions from launcher
 pub use sys::{
     get_instance_resolution, get_screen_resolution, kwin_dbus_start_script,
-    kwin_dbus_unload_script, msg, yesno,
+    kwin_dbus_unload_script, msg, yesno, assign_pointer, auto_assign_mice,
 };
 
 // Re-export functions from updates

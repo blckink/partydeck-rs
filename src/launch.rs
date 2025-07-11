@@ -16,6 +16,7 @@ pub struct PadInfo {
 #[derive(Clone)]
 pub struct MouseInfo {
     pub path: String,
+    pub name: String,
 }
 
 pub trait PadRef {
@@ -26,6 +27,7 @@ pub trait PadRef {
 
 pub trait MouseRef {
     fn path(&self) -> &str;
+    fn name(&self) -> &str;
 }
 
 impl PadRef for Gamepad {
@@ -56,11 +58,17 @@ impl MouseRef for Mouse {
     fn path(&self) -> &str {
         self.path()
     }
+    fn name(&self) -> &str {
+        self.name()
+    }
 }
 
 impl MouseRef for MouseInfo {
     fn path(&self) -> &str {
         &self.path
+    }
+    fn name(&self) -> &str {
+        &self.name
     }
 }
 

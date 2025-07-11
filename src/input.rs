@@ -43,6 +43,8 @@ pub struct Gamepad {
 pub struct Mouse {
     path: String,
     dev: Device,
+    enabled: bool,
+    vendor: u16,
     event_num: u32,
     phys: String,
     uniq: String,
@@ -57,6 +59,12 @@ impl Mouse {
     }
     pub fn event_num(&self) -> u32 {
         self.event_num
+    }
+    pub fn vendor(&self) -> u16 {
+        self.vendor
+    }
+    pub fn enabled(&self) -> bool {
+        self.enabled
     }
     pub fn phys(&self) -> &str {
         &self.phys
@@ -195,10 +203,15 @@ pub fn scan_evdev_gamepads(filter: &PadFilterType) -> Vec<Gamepad> {
 }
 
 #[allow(dead_code)]
-pub fn scan_evdev_mice() -> Vec<Mouse> {
+pub fn scan_evdev_mice(filter: &PadFilterType) -> Vec<Mouse> {
     let mut mice: Vec<Mouse> = Vec::new();
     for dev in evdev::enumerate() {
         let vendor = dev.1.input_id().vendor();
+        let enabled = match filter {
+            PadFilterType::All => true,
+            PadFilterType::NoSteamInput => vendor != 0x28de,
+            PadFilterType::OnlySteamInput => vendor == 0x28de,
+        };
         let has_btn_left = dev
             .1
             .supported_keys()
@@ -215,6 +228,8 @@ pub fn scan_evdev_mice() -> Vec<Mouse> {
                 event_num: parse_event_num(&path),
                 path,
                 dev: dev.1,
+                enabled,
+                vendor,
                 phys,
                 uniq,
             });
