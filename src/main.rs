@@ -5,6 +5,7 @@ mod input;
 mod launch;
 mod paths;
 mod util;
+mod touchpad;
 
 use crate::app::*;
 use crate::paths::*;
@@ -25,6 +26,7 @@ fn main() -> eframe::Result {
     }
 
     println!("\n[PARTYDECK] started\n");
+    let _ds_mice = touchpad::spawn_dualsense_mice();
 
     let fullscreen = std::env::args().any(|arg| arg == "--fullscreen");
 
