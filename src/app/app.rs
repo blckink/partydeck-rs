@@ -640,6 +640,32 @@ impl PartyApp {
         }
     }
 
+    fn pair_phys_to_si(&self, phys_idx: usize) -> Option<usize> {
+        let phys = self.pads[phys_idx].phys();
+        let uniq = self.pads[phys_idx].uniq();
+        self.pads
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| {
+                p.vendor() == 0x28de && (p.phys() == phys || (!uniq.is_empty() && p.uniq() == uniq))
+            })
+            .min_by_key(|(_, p)| p.event_num().abs_diff(self.pads[phys_idx].event_num()))
+            .map(|(idx, _)| idx)
+    }
+
+    fn pair_si_to_phys(&self, si_idx: usize) -> Option<usize> {
+        let phys = self.pads[si_idx].phys();
+        let uniq = self.pads[si_idx].uniq();
+        self.pads
+            .iter()
+            .enumerate()
+            .filter(|(_, p)| {
+                p.vendor() != 0x28de && (p.phys() == phys || (!uniq.is_empty() && p.uniq() == uniq))
+            })
+            .min_by_key(|(_, p)| p.event_num().abs_diff(self.pads[si_idx].event_num()))
+            .map(|(idx, _)| idx)
+    }
+
     fn display_page_players(&mut self, ui: &mut Ui) {
         ui.columns(2, |cols| {
             cols[0].heading("Controllers / Mice");
@@ -667,6 +693,23 @@ impl PartyApp {
         });
 
         ui.separator();
+        ui.heading("Device Pairs");
+        for (idx, pad) in self.pads.iter().enumerate() {
+            if pad.vendor() == 0x28de {
+                continue;
+            }
+            if let Some(si) = self.pair_phys_to_si(idx) {
+                ui.label(format!(
+                    "{} -> {}",
+                    pad.display_name(&self.pads),
+                    self.pads[si].display_name(&self.pads)
+                ));
+            } else {
+                ui.label(format!("{} -> (unpaired)", pad.display_name(&self.pads)));
+            }
+        }
+
+        ui.separator();
 
         ui.separator();
 
@@ -687,13 +730,12 @@ impl PartyApp {
         let mut i = 0;
         while i < self.players.len() {
             let mut remove_player = false;
-            let player = &mut self.players[i];
             ui.horizontal(|ui| {
                 ui.label("👤");
                 if let HandlerRef(_) = cur_game!(self) {
                     egui::ComboBox::from_id_salt(format!("{i}")).show_index(
                         ui,
-                        &mut player.profselection,
+                        &mut self.players[i].profselection,
                         self.profiles.len(),
                         |i| self.profiles[i].clone(),
                     );
@@ -701,32 +743,27 @@ impl PartyApp {
                     ui.label(format!("Player {}", i + 1));
                 }
                 ui.label("🎮");
-                let mut pad_sel = player.mask_pad_index;
+                let mut pad_sel = self.players[i].mask_pad_index;
                 egui::ComboBox::from_id_salt(format!("pad_{i}")).show_index(
                     ui,
                     &mut pad_sel,
                     self.pads.len(),
                     |idx| self.pads[idx].fancyname(),
                 );
-                if pad_sel != player.mask_pad_index {
-                    player.mask_pad_index = pad_sel;
+                if pad_sel != self.players[i].mask_pad_index {
+                    self.players[i].mask_pad_index = pad_sel;
                     if self.pads[pad_sel].vendor() == 0x28de {
-                        if let Some(phys) = self.pads.iter().position(|p| {
-                            p.vendor() != 0x28de
-                                && (p.phys() == self.pads[pad_sel].phys()
-                                    || (!self.pads[pad_sel].uniq().is_empty()
-                                        && p.uniq() == self.pads[pad_sel].uniq()))
-                        }) {
-                            player.pad_index = phys;
+                        if let Some(phys) = self.pair_si_to_phys(pad_sel) {
+                            self.players[i].pad_index = phys;
                         } else {
-                            player.pad_index = pad_sel;
+                            self.players[i].pad_index = pad_sel;
                         }
                     } else {
-                        player.pad_index = pad_sel;
+                        self.players[i].pad_index = pad_sel;
                     }
                 }
-                ui.small(format!("({})", self.pads[player.mask_pad_index].path(),));
-                let mut mouse_sel = player.mouse_index.map(|x| x + 1).unwrap_or(0);
+                ui.small(format!("({})", self.pads[pad_sel].path()));
+                let mut mouse_sel = self.players[i].mouse_index.map(|x| x + 1).unwrap_or(0);
                 egui::ComboBox::from_id_salt(format!("mouse_{i}")).show_index(
                     ui,
                     &mut mouse_sel,
@@ -739,7 +776,7 @@ impl PartyApp {
                         }
                     },
                 );
-                player.mouse_index = if mouse_sel == 0 {
+                self.players[i].mouse_index = if mouse_sel == 0 {
                     None
                 } else {
                     Some(mouse_sel - 1)
@@ -765,7 +802,7 @@ impl PartyApp {
     fn handle_gamepad_gui(&mut self, raw_input: &mut egui::RawInput) {
         let mut key: Option<egui::Key> = None;
         for pad in &mut self.pads {
-            if !pad.enabled() {
+            if !pad.enabled() && self.options.pad_filter_type != PadFilterType::OnlySteamInput {
                 continue;
             }
             match pad.poll() {
@@ -815,48 +852,22 @@ impl PartyApp {
 
     fn handle_gamepad_players(&mut self) {
         for i in 0..self.pads.len() {
-            if is_pad_in_players(i, &self.players) || !self.pads[i].enabled() {
+            if is_pad_in_players(i, &self.players) {
                 continue;
             }
-            let (btn, phys, uniq, evnum) = {
+            if !self.pads[i].enabled()
+                && self.options.pad_filter_type != PadFilterType::OnlySteamInput
+            {
+                continue;
+            }
+            let btn = {
                 let pad = &mut self.pads[i];
-                (
-                    pad.poll(),
-                    pad.phys().to_string(),
-                    pad.uniq().to_string(),
-                    pad.event_num(),
-                )
+                pad.poll()
             };
             match btn {
                 Some(PadButton::ABtn) => {
                     if self.players.len() < 4 {
-                        let mask_candidates: Vec<(usize, u32)> = self
-                            .pads
-                            .iter()
-                            .enumerate()
-                            .filter(|(_, p)| {
-                                p.vendor() == 0x28de
-                                    && p.enabled()
-                                    && (p.phys() == phys
-                                        || (!uniq.is_empty() && p.uniq() == uniq))
-                            })
-                            .map(|(idx, p)| (idx, p.event_num()))
-                            .collect();
-                        let mut avail: Vec<(usize, u32)> = mask_candidates
-                            .iter()
-                            .cloned()
-                            .filter(|(idx, _)| {
-                                !self.players.iter().any(|pl| pl.mask_pad_index == *idx)
-                            })
-                            .collect();
-                        if avail.is_empty() {
-                            avail = mask_candidates.clone();
-                        }
-                        let mask_idx = avail
-                            .into_iter()
-                            .min_by_key(|(_, e)| (e.abs_diff(evnum)))
-                            .map(|(idx, _)| idx)
-                            .unwrap_or(i);
+                        let mask_idx = self.pair_phys_to_si(i).unwrap_or(i);
 
                         let mouse_candidates: Vec<(usize, u32)> = self
                             .mice
@@ -883,9 +894,7 @@ impl PartyApp {
                         }
                         let mouse_idx = m_avail
                             .into_iter()
-                            .min_by_key(|(_, e)| {
-                                e.abs_diff(self.pads[mask_idx].event_num())
-                            })
+                            .min_by_key(|(_, e)| e.abs_diff(self.pads[mask_idx].event_num()))
                             .map(|(idx, _)| idx);
 
                         self.players.push(Player {
