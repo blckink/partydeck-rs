@@ -5,6 +5,8 @@ use crate::launch::launch_game;
 use crate::paths::*;
 use crate::util::*;
 
+use std::collections::HashMap;
+
 use dialog::DialogBox;
 use eframe::egui::RichText;
 use eframe::egui::{self, Key, Ui};
@@ -32,6 +34,7 @@ pub struct PartyApp {
     pub infotext: String,
 
     pub input_devices: Vec<InputDevice>,
+    pub steam_map: HashMap<usize, Vec<usize>>,
     pub instances: Vec<Instance>,
     pub instance_add_dev: Option<usize>,
     pub games: Vec<Game>,
@@ -40,6 +43,9 @@ pub struct PartyApp {
 
     pub loading_msg: Option<String>,
     pub loading_since: Option<std::time::Instant>,
+    pub testing_device: Option<usize>,
+    pub testing_last_btn: Option<String>,
+    pub testing_start: Option<std::time::Instant>,
     #[allow(dead_code)]
     pub task: Option<std::thread::JoinHandle<()>>,
 }
@@ -54,6 +60,7 @@ impl Default for PartyApp {
     fn default() -> Self {
         let options = load_cfg();
         let input_devices = scan_input_devices(&options.pad_filter_type);
+        let steam_map = map_steam_inputs(&input_devices);
         Self {
             needs_update: check_for_partydeck_update(),
             options,
@@ -61,6 +68,7 @@ impl Default for PartyApp {
             settings_page: SettingsPage::General,
             infotext: String::new(),
             input_devices,
+            steam_map,
             instances: Vec::new(),
             instance_add_dev: None,
             games: scan_all_games(),
@@ -68,6 +76,9 @@ impl Default for PartyApp {
             profiles: Vec::new(),
             loading_msg: None,
             loading_since: None,
+            testing_device: None,
+            testing_last_btn: None,
+            testing_start: None,
             task: None,
         }
     }
@@ -163,6 +174,35 @@ impl eframe::App for PartyApp {
                                 ui.add(egui::widgets::Spinner::new().size(40.0));
                                 ui.add_space(8.0);
                                 ui.label(msg);
+                            });
+                        });
+                });
+        }
+        if let Some(dev_idx) = self.testing_device {
+            if let Some(btn) = self.input_devices[dev_idx].poll() {
+                self.testing_last_btn = Some(format!("{:?}", btn));
+                self.testing_start = Some(std::time::Instant::now());
+            }
+            if let Some(start) = self.testing_start {
+                if start.elapsed() > std::time::Duration::from_secs(5) {
+                    self.testing_device = None;
+                }
+            }
+            egui::Area::new("testing".into())
+                .anchor(egui::Align2::CENTER_TOP, egui::Vec2::new(0.0, 20.0))
+                .show(ctx, |ui| {
+                    egui::Frame::NONE
+                        .fill(egui::Color32::from_rgba_premultiplied(0, 0, 0, 192))
+                        .corner_radius(6.0)
+                        .inner_margin(egui::Margin::symmetric(16, 12))
+                        .show(ui, |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.label(format!("Testing {}", self.input_devices[dev_idx].fancyname()));
+                                if let Some(b) = &self.testing_last_btn {
+                                    ui.label(format!("Last: {b}"));
+                                } else {
+                                    ui.label("Press any button...");
+                                }
                             });
                         });
                 });
@@ -430,6 +470,7 @@ impl PartyApp {
                         pad_filter_type: PadFilterType::NoSteamInput,
                     };
                     self.input_devices = scan_input_devices(&self.options.pad_filter_type);
+                    self.steam_map = map_steam_inputs(&self.input_devices);
                 }
             });
             ui.separator();
@@ -592,22 +633,33 @@ impl PartyApp {
                     ui.label("Adding new device...");
                 }
             });
-            for &dev in instance.devices.iter() {
+            for (d_index, dev) in instance.devices.iter_mut().enumerate() {
                 let mut dev_text = RichText::new(format!(
                     "{} {}",
-                    self.input_devices[dev].emoji(),
-                    self.input_devices[dev].fancyname()
+                    self.input_devices[*dev].emoji(),
+                    self.input_devices[*dev].fancyname()
                 ));
 
-                if self.input_devices[dev].has_button_held() {
+                if self.input_devices[*dev].has_button_held() {
                     dev_text = dev_text.strong();
                 }
 
-                ui.horizontal(|ui| {
+            ui.horizontal(|ui| {
                     ui.label("  ");
-                    ui.label(dev_text);
+                    egui::ComboBox::from_id_salt(format!("dev{}_{}", i, d_index))
+                        .selected_text(format!("{} {}", self.input_devices[*dev].emoji(), self.input_devices[*dev].fancyname()))
+                        .show_ui(ui, |ui| {
+                            for (idx, p) in self.input_devices.iter().enumerate() {
+                                ui.selectable_value(dev, idx, format!("{} {}", p.emoji(), p.fancyname()));
+                            }
+                        });
+                    if ui.button("Test").clicked() {
+                        self.testing_device = Some(*dev);
+                        self.testing_last_btn = None;
+                        self.testing_start = Some(std::time::Instant::now());
+                    }
                     if ui.button("🗑").clicked() {
-                        devices_to_remove.push(dev);
+                        devices_to_remove.push(*dev);
                     }
                 });
             }
@@ -686,6 +738,7 @@ impl PartyApp {
 
             if r1.clicked() || r2.clicked() || r3.clicked() {
                 self.input_devices = scan_input_devices(&self.options.pad_filter_type);
+                self.steam_map = map_steam_inputs(&self.input_devices);
             }
         });
 
@@ -822,6 +875,7 @@ impl PartyApp {
             if ui.button("🎮 Rescan").clicked() {
                 self.instances.clear();
                 self.input_devices = scan_input_devices(&self.options.pad_filter_type);
+                self.steam_map = map_steam_inputs(&self.input_devices);
             }
 
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
@@ -904,12 +958,14 @@ impl PartyApp {
         ui.heading("Devices");
         ui.separator();
 
-        for pad in self.input_devices.iter() {
+        for (i, pad) in self.input_devices.iter().enumerate() {
+            let label_type = if pad.is_steam_input() { "Steam Input" } else { "Real" };
             let mut dev_text = RichText::new(format!(
-                "{} {} ({})",
+                "{} {} ({}) - {}",
                 pad.emoji(),
                 pad.fancyname(),
-                pad.path()
+                pad.path(),
+                label_type
             ))
             .small();
 
@@ -920,6 +976,15 @@ impl PartyApp {
             }
 
             ui.label(dev_text);
+
+            if !pad.is_steam_input() {
+                if let Some(stds) = self.steam_map.get(&i) {
+                    for sid in stds {
+                        let sdev = &self.input_devices[*sid];
+                        ui.label(format!("  ↳ {} {}", sdev.emoji(), sdev.fancyname()));
+                    }
+                }
+            }
         }
     }
 
