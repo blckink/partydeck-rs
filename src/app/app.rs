@@ -43,6 +43,9 @@ pub struct PartyApp {
 
     pub loading_msg: Option<String>,
     pub loading_since: Option<std::time::Instant>,
+    pub testing_device: Option<usize>,
+    pub testing_last_btn: Option<String>,
+    pub testing_start: Option<std::time::Instant>,
     #[allow(dead_code)]
     pub task: Option<std::thread::JoinHandle<()>>,
 }
@@ -74,6 +77,9 @@ impl Default for PartyApp {
             profiles: Vec::new(),
             loading_msg: None,
             loading_since: None,
+            testing_device: None,
+            testing_last_btn: None,
+            testing_start: None,
             task: None,
         }
     }
@@ -169,6 +175,35 @@ impl eframe::App for PartyApp {
                                 ui.add(egui::widgets::Spinner::new().size(40.0));
                                 ui.add_space(8.0);
                                 ui.label(msg);
+                            });
+                        });
+                });
+        }
+        if let Some(dev_idx) = self.testing_device {
+            if let Some(btn) = self.input_devices[dev_idx].poll() {
+                self.testing_last_btn = Some(format!("{:?}", btn));
+                self.testing_start = Some(std::time::Instant::now());
+            }
+            if let Some(start) = self.testing_start {
+                if start.elapsed() > std::time::Duration::from_secs(5) {
+                    self.testing_device = None;
+                }
+            }
+            egui::Area::new("testing".into())
+                .anchor(egui::Align2::CENTER_TOP, egui::Vec2::new(0.0, 20.0))
+                .show(ctx, |ui| {
+                    egui::Frame::NONE
+                        .fill(egui::Color32::from_rgba_premultiplied(0, 0, 0, 192))
+                        .corner_radius(6.0)
+                        .inner_margin(egui::Margin::symmetric(16, 12))
+                        .show(ui, |ui| {
+                            ui.vertical_centered(|ui| {
+                                ui.label(format!("Testing {}", self.input_devices[dev_idx].fancyname()));
+                                if let Some(b) = &self.testing_last_btn {
+                                    ui.label(format!("Last: {b}"));
+                                } else {
+                                    ui.label("Press any button...");
+                                }
                             });
                         });
                 });
@@ -699,8 +734,6 @@ impl PartyApp {
                 "Splits two-player games vertically (side by side) instead of horizontally."
                     .to_string();
         }
-
-
 
         ui.horizontal(|ui| {
         let proton_ver_label = ui.label("Proton version");

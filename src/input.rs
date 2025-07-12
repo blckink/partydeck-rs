@@ -254,3 +254,4 @@ pub fn fill_steam_names(devs: &mut [InputDevice]) {
         }
     }
 }
+
