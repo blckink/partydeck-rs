@@ -1,4 +1,5 @@
 use crate::app::PadFilterType;
+use steamworks;
 
 #[derive(Clone)]
 pub struct Instance {
@@ -50,6 +51,8 @@ pub struct InputDevice {
     path: String,
     dev: Device,
     phys: String,
+    uniq: String,
+    steam_name: Option<String>,
     enabled: bool,
     device_type: DeviceType,
     has_button_held: bool,
@@ -67,6 +70,9 @@ impl InputDevice {
         }
     }
     pub fn fancyname(&self) -> &str {
+        if let Some(name) = &self.steam_name {
+            return name;
+        }
         match self.dev.input_id().vendor() {
             0x045e => "Xbox Controller",
             0x054c => "PS Controller",
@@ -80,6 +86,9 @@ impl InputDevice {
     }
     pub fn phys(&self) -> &str {
         &self.phys
+    }
+    pub fn uniq(&self) -> &str {
+        &self.uniq
     }
     pub fn vendor(&self) -> u16 {
         self.dev.input_id().vendor()
@@ -183,11 +192,14 @@ pub fn scan_input_devices(filter: &PadFilterType) -> Vec<InputDevice> {
                 continue;
             }
             let phys = dev.1.physical_path().unwrap_or_default().to_string();
+            let uniq = dev.1.unique_name().unwrap_or_default().to_string();
             let device = dev.1;
             pads.push(InputDevice {
                 path: dev.0.to_str().unwrap().to_string(),
                 dev: device,
                 phys,
+                uniq,
+                steam_name: None,
                 enabled,
                 device_type,
                 has_button_held: false,
@@ -206,7 +218,13 @@ pub fn map_steam_inputs(devs: &[InputDevice]) -> std::collections::HashMap<usize
             if let Some((real_idx, _)) = devs
                 .iter()
                 .enumerate()
-                .find(|(_, d)| !d.is_steam_input() && d.phys() == dev.phys())
+                .find(|(_, d)| !d.is_steam_input() && d.uniq() == dev.uniq() && !dev.uniq().is_empty())
+            {
+                map.entry(real_idx).or_default().push(i);
+            } else if let Some((real_idx, _)) = devs
+                .iter()
+                .enumerate()
+                .find(|(_, d)| !d.is_steam_input() && d.phys() == dev.phys() && !dev.phys().is_empty())
             {
                 map.entry(real_idx).or_default().push(i);
             }
@@ -214,3 +232,26 @@ pub fn map_steam_inputs(devs: &[InputDevice]) -> std::collections::HashMap<usize
     }
     map
 }
+
+pub fn fill_steam_names(devs: &mut [InputDevice]) {
+    if let Ok(client) = steamworks::Client::init() {
+        let input = client.input();
+        input.run_frame();
+        let handles = input.get_connected_controllers();
+        for (sid, handle) in handles.iter().enumerate() {
+            let name = match input.get_input_type_for_handle(*handle) {
+                steamworks::InputType::PS4Controller => "PS4 Controller",
+                steamworks::InputType::PS5Controller => "PS5 Controller",
+                steamworks::InputType::XBoxOneController => "Xbox Controller",
+                steamworks::InputType::XBox360Controller => "Xbox Controller",
+                steamworks::InputType::SwitchProController => "Switch Pro",
+                steamworks::InputType::SteamDeckController => "Steam Deck",
+                _ => "Steam Input",
+            };
+            if let Some(dev) = devs.iter_mut().filter(|d| d.is_steam_input()).nth(sid) {
+                dev.steam_name = Some(name.to_string());
+            }
+        }
+    }
+}
+

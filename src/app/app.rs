@@ -59,7 +59,8 @@ macro_rules! cur_game {
 impl Default for PartyApp {
     fn default() -> Self {
         let options = load_cfg();
-        let input_devices = scan_input_devices(&options.pad_filter_type);
+        let mut input_devices = scan_input_devices(&options.pad_filter_type);
+        fill_steam_names(&mut input_devices);
         let steam_map = map_steam_inputs(&input_devices);
         Self {
             needs_update: check_for_partydeck_update(),
@@ -470,6 +471,7 @@ impl PartyApp {
                         pad_filter_type: PadFilterType::NoSteamInput,
                     };
                     self.input_devices = scan_input_devices(&self.options.pad_filter_type);
+                    fill_steam_names(&mut self.input_devices);
                     self.steam_map = map_steam_inputs(&self.input_devices);
                 }
             });
@@ -622,16 +624,6 @@ impl PartyApp {
                     );
                 }
 
-                if self.instance_add_dev == None {
-                    if ui.button("➕ Add Device").clicked() {
-                        self.instance_add_dev = Some(i);
-                    }
-                } else if self.instance_add_dev == Some(i) {
-                    if ui.button("🗙 Cancel").clicked() {
-                        self.instance_add_dev = None;
-                    }
-                    ui.label("Adding new device...");
-                }
             });
             for (d_index, dev) in instance.devices.iter_mut().enumerate() {
                 let mut dev_text = RichText::new(format!(
@@ -645,23 +637,52 @@ impl PartyApp {
                 }
 
             ui.horizontal(|ui| {
-                    ui.label("  ");
-                    egui::ComboBox::from_id_salt(format!("dev{}_{}", i, d_index))
-                        .selected_text(format!("{} {}", self.input_devices[*dev].emoji(), self.input_devices[*dev].fancyname()))
-                        .show_ui(ui, |ui| {
-                            for (idx, p) in self.input_devices.iter().enumerate() {
-                                ui.selectable_value(dev, idx, format!("{} {}", p.emoji(), p.fancyname()));
+                ui.label("  ");
+                // determine currently selected real device
+                let mut real_sel = if let Some((r, _)) = self
+                    .steam_map
+                    .iter()
+                    .find(|(_, v)| v.contains(dev))
+                {
+                    *r
+                } else {
+                    *dev
+                };
+                egui::ComboBox::from_id_salt(format!("real{}_{}", i, d_index))
+                    .selected_text(format!("{} {}", self.input_devices[real_sel].emoji(), self.input_devices[real_sel].fancyname()))
+                    .show_ui(ui, |ui| {
+                        for (idx, p) in self.input_devices.iter().enumerate() {
+                            if !p.is_steam_input() {
+                                ui.selectable_value(&mut real_sel, idx, format!("{} {}", p.emoji(), p.fancyname()));
                             }
-                        });
-                    if ui.button("Test").clicked() {
-                        self.testing_device = Some(*dev);
-                        self.testing_last_btn = None;
-                        self.testing_start = Some(std::time::Instant::now());
-                    }
-                    if ui.button("🗑").clicked() {
-                        devices_to_remove.push(*dev);
-                    }
-                });
+                        }
+                    });
+
+                let steam_list = self.steam_map.get(&real_sel).cloned().unwrap_or_default();
+                let mut mode_idx = if let Some(pos) = steam_list.iter().position(|s| s == dev) {
+                    pos + 1
+                } else {
+                    0
+                };
+
+                egui::ComboBox::from_id_salt(format!("mode{}_{}", i, d_index))
+                    .selected_text(match mode_idx {
+                        0 => "Native".to_string(),
+                        n => format!("{}", self.input_devices[steam_list[n - 1]].fancyname()),
+                    })
+                    .show_ui(ui, |ui| {
+                        ui.selectable_value(&mut mode_idx, 0, "Native");
+                        for (idx, sid) in steam_list.iter().enumerate() {
+                            ui.selectable_value(&mut mode_idx, idx + 1, self.input_devices[*sid].fancyname());
+                        }
+                    });
+
+                *dev = if mode_idx == 0 { real_sel } else { steam_list[mode_idx - 1] };
+
+                if ui.button("🗑").clicked() {
+                    devices_to_remove.push(*dev);
+                }
+            });
             }
         }
 
@@ -713,34 +734,6 @@ impl PartyApp {
                 "Splits two-player games vertically (side by side) instead of horizontally."
                     .to_string();
         }
-
-        ui.horizontal(|ui| {
-            let filter_label = ui.label("Controller filter");
-            let r1 = ui.radio_value(
-                &mut self.options.pad_filter_type,
-                PadFilterType::All,
-                "All controllers",
-            );
-            let r2 = ui.radio_value(
-                &mut self.options.pad_filter_type,
-                PadFilterType::NoSteamInput,
-                "No Steam Input",
-            );
-            let r3 = ui.radio_value(
-                &mut self.options.pad_filter_type,
-                PadFilterType::OnlySteamInput,
-                "Only Steam Input",
-            );
-
-            if filter_label.hovered() || r1.hovered() || r2.hovered() || r3.hovered() {
-                self.infotext = "Select which controllers to filter out. If unsure, set this to \"No Steam Input\". If you use Steam Input to remap controllers, you may want to select \"Only Steam Input\", but be warned that this option is experimental and is known to break certain Proton games.".to_string();
-            }
-
-            if r1.clicked() || r2.clicked() || r3.clicked() {
-                self.input_devices = scan_input_devices(&self.options.pad_filter_type);
-                self.steam_map = map_steam_inputs(&self.input_devices);
-            }
-        });
 
         ui.horizontal(|ui| {
         let proton_ver_label = ui.label("Proton version");
@@ -875,6 +868,7 @@ impl PartyApp {
             if ui.button("🎮 Rescan").clicked() {
                 self.instances.clear();
                 self.input_devices = scan_input_devices(&self.options.pad_filter_type);
+                fill_steam_names(&mut self.input_devices);
                 self.steam_map = map_steam_inputs(&self.input_devices);
             }
 

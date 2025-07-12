@@ -44,7 +44,7 @@ pub fn load_cfg() -> PartyConfig {
         kbm_support: true,
         proton_version: "".to_string(),
         vertical_two_player: false,
-        pad_filter_type: PadFilterType::NoSteamInput,
+        pad_filter_type: PadFilterType::All,
     }
 }
 
