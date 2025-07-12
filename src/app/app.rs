@@ -952,14 +952,21 @@ impl PartyApp {
         ui.heading("Devices");
         ui.separator();
 
+        let mut deck_indices: Vec<usize> = Vec::new();
         for (i, pad) in self.input_devices.iter().enumerate() {
-            let label_type = if pad.is_steam_input() { "Steam Input" } else { "Real" };
+            if pad.is_steam_input() {
+                continue;
+            }
+            if pad.vendor() == 0x28de {
+                deck_indices.push(i);
+                continue;
+            }
+
             let mut dev_text = RichText::new(format!(
-                "{} {} ({}) - {}",
+                "{} {} ({})",
                 pad.emoji(),
-                pad.fancyname(),
-                pad.path(),
-                label_type
+                pad.name(),
+                pad.path()
             ))
             .small();
 
@@ -971,11 +978,29 @@ impl PartyApp {
 
             ui.label(dev_text);
 
-            if !pad.is_steam_input() {
+            if let Some(stds) = self.steam_map.get(&i) {
+                for sid in stds {
+                    let sdev = &self.input_devices[*sid];
+                    ui.label(RichText::new(format!("  ↳ {} {}", sdev.emoji(), sdev.fancyname())).small());
+                }
+            }
+        }
+
+        if !deck_indices.is_empty() {
+            ui.label(RichText::new("Steam Deck").strong());
+            for i in deck_indices {
+                let pad = &self.input_devices[i];
+                let mut dev_text = RichText::new(format!("  {} {} ({})", pad.emoji(), pad.name(), pad.path())).small();
+                if !pad.enabled() {
+                    dev_text = dev_text.weak();
+                } else if pad.has_button_held() {
+                    dev_text = dev_text.strong();
+                }
+                ui.label(dev_text);
                 if let Some(stds) = self.steam_map.get(&i) {
                     for sid in stds {
                         let sdev = &self.input_devices[*sid];
-                        ui.label(format!("  ↳ {} {}", sdev.emoji(), sdev.fancyname()));
+                        ui.label(RichText::new(format!("    ↳ {} {}", sdev.emoji(), sdev.fancyname())).small());
                     }
                 }
             }
