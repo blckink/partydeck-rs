@@ -868,7 +868,6 @@ impl PartyApp {
                 Some(PadButton::ABtn) => {
                     if self.players.len() < 4 {
                         let mask_idx = self.pair_phys_to_si(i).unwrap_or(i);
-
                         let mouse_candidates: Vec<(usize, u32)> = self
                             .mice
                             .iter()
