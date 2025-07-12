@@ -36,7 +36,6 @@ pub struct PartyApp {
     pub input_devices: Vec<InputDevice>,
     pub steam_map: HashMap<usize, Vec<usize>>,
     pub instances: Vec<Instance>,
-    pub instance_add_dev: Option<usize>,
     pub games: Vec<Game>,
     pub selected_game: usize,
     pub profiles: Vec<String>,
@@ -71,7 +70,6 @@ impl Default for PartyApp {
             input_devices,
             steam_map,
             instances: Vec::new(),
-            instance_add_dev: None,
             games: scan_all_games(),
             selected_game: 0,
             profiles: Vec::new(),
@@ -86,14 +84,11 @@ impl Default for PartyApp {
 }
 
 impl eframe::App for PartyApp {
-    fn raw_input_hook(&mut self, _ctx: &egui::Context, raw_input: &mut egui::RawInput) {
+    fn raw_input_hook(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         if !raw_input.focused {
             return;
         }
-        match self.cur_page {
-            MenuPage::Instances => self.handle_devices_instance_menu(),
-            _ => self.handle_gamepad_gui(raw_input),
-        }
+        self.handle_gamepad_gui(ctx, raw_input);
     }
 
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -251,29 +246,17 @@ impl PartyApp {
         }
     }
 
-    fn handle_gamepad_gui(&mut self, raw_input: &mut egui::RawInput) {
+    fn handle_gamepad_gui(&mut self, ctx: &egui::Context, raw_input: &mut egui::RawInput) {
         let mut key: Option<egui::Key> = None;
         for pad in &mut self.input_devices {
             if !pad.enabled() {
                 continue;
             }
             match pad.poll() {
-                Some(PadButton::ABtn) => key = Some(Key::Enter),
-                Some(PadButton::BBtn) => self.cur_page = MenuPage::Home,
-                Some(PadButton::XBtn) => {
-                    self.profiles = scan_profiles(false);
-                    self.cur_page = MenuPage::Profiles;
+                Some(PadButton::ABtn) | Some(PadButton::ZKey) | Some(PadButton::RightClick) => {
+                    key = Some(Key::Enter)
                 }
-                Some(PadButton::YBtn) => self.cur_page = MenuPage::Settings,
-                Some(PadButton::SelectBtn) => key = Some(Key::Tab),
-                Some(PadButton::StartBtn) => {
-                    if self.cur_page == MenuPage::Game {
-                        self.instances.clear();
-                        self.profiles = scan_profiles(true);
-                        self.instance_add_dev = None;
-                        self.cur_page = MenuPage::Instances;
-                    }
-                }
+                Some(PadButton::BBtn) => key = Some(Key::Escape),
                 Some(PadButton::Up) => key = Some(Key::ArrowUp),
                 Some(PadButton::Down) => key = Some(Key::ArrowDown),
                 Some(PadButton::Left) => key = Some(Key::ArrowLeft),
@@ -284,6 +267,16 @@ impl PartyApp {
         }
 
         if let Some(key) = key {
+            if !ctx.memory(|mem| mem.focused().is_some()) {
+                raw_input.events.push(egui::Event::Key {
+                    key: Key::Tab,
+                    physical_key: None,
+                    pressed: true,
+                    repeat: false,
+                    modifiers: egui::Modifiers::default(),
+                });
+            }
+
             raw_input.events.push(egui::Event::Key {
                 key,
                 physical_key: None,
@@ -294,73 +287,6 @@ impl PartyApp {
         }
     }
 
-    fn handle_devices_instance_menu(&mut self) {
-        let mut i = 0;
-        while i < self.input_devices.len() {
-            if !self.input_devices[i].enabled() {
-                i += 1;
-                continue;
-            }
-            match self.input_devices[i].poll() {
-                Some(PadButton::ABtn) | Some(PadButton::ZKey) | Some(PadButton::RightClick) => {
-                    if self.input_devices[i].device_type() != DeviceType::Gamepad
-                        && !self.options.kbm_support
-                    {
-                        continue;
-                    }
-                    if self.is_device_in_any_instance(i) {
-                        continue;
-                    }
-
-                    match self.instance_add_dev {
-                        Some(inst) => {
-                            self.instance_add_dev = None;
-                            self.instances[inst].devices.push(i);
-                        }
-                        None => {
-                            self.instances.push(Instance {
-                                devices: vec![i],
-                                profname: String::new(),
-                                profselection: 0,
-                            });
-                        }
-                    }
-                }
-                Some(PadButton::BBtn) | Some(PadButton::XKey) => {
-                    if self.instance_add_dev != None {
-                        self.instance_add_dev = None;
-                    } else if self.is_device_in_any_instance(i) {
-                        self.remove_device(i);
-                    } else if self.instances.len() < 1 {
-                        self.cur_page = MenuPage::Game;
-                    }
-                }
-                Some(PadButton::YBtn) | Some(PadButton::AKey) => {
-                    if self.instance_add_dev == None {
-                        if let Some((instance, _)) = self.find_device_in_instance(i) {
-                            self.instance_add_dev = Some(instance);
-                        }
-                    }
-                }
-                Some(PadButton::StartBtn) => {
-                    if self.instances.len() > 0 && self.is_device_in_any_instance(i) {
-                        self.prepare_game_launch();
-                    }
-                }
-                _ => {}
-            }
-            i += 1;
-        }
-    }
-
-    fn is_device_in_any_instance(&mut self, dev: usize) -> bool {
-        for instance in &self.instances {
-            if instance.devices.contains(&dev) {
-                return true;
-            }
-        }
-        false
-    }
 
     fn find_device_in_instance(&mut self, dev: usize) -> Option<(usize, usize)> {
         for (i, instance) in self.instances.iter().enumerate() {
@@ -380,6 +306,17 @@ impl PartyApp {
                 self.instances.remove(instance_index);
             }
         }
+    }
+
+    fn next_unused_device(&self) -> Option<usize> {
+        for (i, d) in self.input_devices.iter().enumerate() {
+            if d.enabled()
+                && !self.instances.iter().any(|inst| inst.devices.contains(&i))
+            {
+                return Some(i);
+            }
+        }
+        None
     }
 
     fn prepare_game_launch(&mut self) {
@@ -425,7 +362,7 @@ impl PartyApp {
     fn display_page_main(&mut self, ui: &mut Ui) {
         ui.heading("Welcome to PartyDeck");
         ui.separator();
-        ui.label("Press SELECT/BACK or Tab to unlock gamepad navigation.");
+        ui.label("Use the arrow keys to navigate. Press the bottom action button or Enter to select. Use the right action button or Escape to go back.");
         ui.label("PartyDeck is in the very early stages of development; as such, you will likely encounter bugs, issues, and strange design decisions.");
         ui.label("For debugging purposes, it's recommended to read terminal output (stdout) for further information on errors.");
         ui.label("If you have found this software useful, consider donating to support further development!");
@@ -537,7 +474,6 @@ impl PartyApp {
             if ui.button("Play").clicked() {
                 self.instances.clear();
                 self.profiles = scan_profiles(true);
-                self.instance_add_dev = None;
                 self.cur_page = MenuPage::Instances;
             }
             if let HandlerRef(h) = cur_game!(self) {
@@ -580,31 +516,25 @@ impl PartyApp {
         ui.separator();
 
         ui.horizontal(|ui| {
-            ui.add(
-                egui::Image::new(egui::include_image!("../../res/BTN_SOUTH.png")).max_height(12.0),
-            );
-            ui.label("[Z]");
-            ui.add(
-                egui::Image::new(egui::include_image!("../../res/MOUSE_RIGHT.png"))
-                    .max_height(12.0),
-            );
-            let add_text = match self.instance_add_dev {
-                None => "New Instance",
-                Some(i) => &format!("Add to Instance {}", i + 1),
-            };
-            ui.label(add_text);
-
-            ui.label("      ");
-
-            ui.add(
-                egui::Image::new(egui::include_image!("../../res/BTN_EAST.png")).max_height(12.0),
-            );
-            ui.label("[X]");
-            let remove_text = match self.instance_add_dev {
-                None => "Remove",
-                Some(_) => "Cancel",
-            };
-            ui.label(remove_text);
+            if ui.button("New Instance").clicked() {
+                if let Some(dev) = self.next_unused_device() {
+                    self.instances.push(Instance {
+                        devices: vec![dev],
+                        profname: String::new(),
+                        profselection: 0,
+                    });
+                }
+            }
+            if let Some(last) = self.instances.last_mut() {
+                if ui.button("Remove Last Device").clicked() {
+                    if let Some(dev) = last.devices.pop() {
+                        if last.devices.is_empty() {
+                            self.instances.pop();
+                        }
+                        let _ = dev; // not used further
+                    }
+                }
+            }
         });
 
         ui.separator();
