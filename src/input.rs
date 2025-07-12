@@ -17,6 +17,7 @@ pub enum DeviceType {
     Other,
 }
 
+#[derive(Debug)]
 pub enum PadButton {
     Left,
     Right,
@@ -48,6 +49,7 @@ pub struct DeviceInfo {
 pub struct InputDevice {
     path: String,
     dev: Device,
+    phys: String,
     enabled: bool,
     device_type: DeviceType,
     has_button_held: bool,
@@ -76,8 +78,14 @@ impl InputDevice {
     pub fn path(&self) -> &str {
         &self.path
     }
+    pub fn phys(&self) -> &str {
+        &self.phys
+    }
     pub fn vendor(&self) -> u16 {
         self.dev.input_id().vendor()
+    }
+    pub fn is_steam_input(&self) -> bool {
+        self.vendor() == 0x28de
     }
     pub fn enabled(&self) -> bool {
         self.enabled
@@ -174,9 +182,12 @@ pub fn scan_input_devices(filter: &PadFilterType) -> Vec<InputDevice> {
                 println!("Failed to set non-blocking mode for {}", dev.0.display());
                 continue;
             }
+            let phys = dev.1.physical_path().unwrap_or_default().to_string();
+            let device = dev.1;
             pads.push(InputDevice {
                 path: dev.0.to_str().unwrap().to_string(),
-                dev: dev.1,
+                dev: device,
+                phys,
                 enabled,
                 device_type,
                 has_button_held: false,
@@ -185,4 +196,21 @@ pub fn scan_input_devices(filter: &PadFilterType) -> Vec<InputDevice> {
     }
     pads.sort_by_key(|pad| pad.path().to_string());
     pads
+}
+
+pub fn map_steam_inputs(devs: &[InputDevice]) -> std::collections::HashMap<usize, Vec<usize>> {
+    use std::collections::HashMap;
+    let mut map: HashMap<usize, Vec<usize>> = HashMap::new();
+    for (i, dev) in devs.iter().enumerate() {
+        if dev.is_steam_input() {
+            if let Some((real_idx, _)) = devs
+                .iter()
+                .enumerate()
+                .find(|(_, d)| !d.is_steam_input() && d.phys() == dev.phys())
+            {
+                map.entry(real_idx).or_default().push(i);
+            }
+        }
+    }
+    map
 }
