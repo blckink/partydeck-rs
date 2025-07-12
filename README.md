@@ -53,6 +53,8 @@ When Steam Input is enabled, each controller shows up twice on the Players page:
 
 You'll need a Rust toolchain installed with the 2024 Edition. Clone the repo, and run `build.sh`. This will place the executable, as well as the relevant data files, into the "build" folder.
 
+The `hidapi` crate requires the system library **libudev** to be installed. On Arch Linux you can run `sudo pacman -Syu libudev.so` (provided by `systemd-libs`), while Debian/Ubuntu users can install `libudev-dev`.
+
 
 ## How it Works
 
