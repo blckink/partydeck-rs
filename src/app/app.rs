@@ -667,6 +667,28 @@ impl PartyApp {
         });
 
         ui.separator();
+        ui.heading("Steam Input Pairs");
+        for si_idx in 0..self.pads.len() {
+            if self.pads[si_idx].vendor() != 0x28de {
+                continue;
+            }
+            if let Some(phys_idx) = self.pads.iter().position(|p| {
+                p.vendor() != 0x28de
+                    && (p.phys() == self.pads[si_idx].phys()
+                        || (!self.pads[si_idx].uniq().is_empty()
+                            && p.uniq() == self.pads[si_idx].uniq()))
+            }) {
+                ui.label(format!(
+                    "{} -> {}",
+                    self.pads[phys_idx].fancyname(),
+                    self.pads[si_idx].fancyname()
+                ));
+            } else {
+                ui.label(format!("(unpaired) -> {}", self.pads[si_idx].fancyname()));
+            }
+        }
+
+        ui.separator();
 
         ui.separator();
 
@@ -765,7 +787,7 @@ impl PartyApp {
     fn handle_gamepad_gui(&mut self, raw_input: &mut egui::RawInput) {
         let mut key: Option<egui::Key> = None;
         for pad in &mut self.pads {
-            if !pad.enabled() {
+            if !pad.enabled() && self.options.pad_filter_type != PadFilterType::OnlySteamInput {
                 continue;
             }
             match pad.poll() {
@@ -815,7 +837,12 @@ impl PartyApp {
 
     fn handle_gamepad_players(&mut self) {
         for i in 0..self.pads.len() {
-            if is_pad_in_players(i, &self.players) || !self.pads[i].enabled() {
+            if is_pad_in_players(i, &self.players) {
+                continue;
+            }
+            if !self.pads[i].enabled()
+                && self.options.pad_filter_type != PadFilterType::OnlySteamInput
+            {
                 continue;
             }
             let (btn, phys, uniq, evnum) = {
@@ -837,8 +864,7 @@ impl PartyApp {
                             .filter(|(_, p)| {
                                 p.vendor() == 0x28de
                                     && p.enabled()
-                                    && (p.phys() == phys
-                                        || (!uniq.is_empty() && p.uniq() == uniq))
+                                    && (p.phys() == phys || (!uniq.is_empty() && p.uniq() == uniq))
                             })
                             .map(|(idx, p)| (idx, p.event_num()))
                             .collect();
@@ -883,9 +909,7 @@ impl PartyApp {
                         }
                         let mouse_idx = m_avail
                             .into_iter()
-                            .min_by_key(|(_, e)| {
-                                e.abs_diff(self.pads[mask_idx].event_num())
-                            })
+                            .min_by_key(|(_, e)| e.abs_diff(self.pads[mask_idx].event_num()))
                             .map(|(idx, _)| idx);
 
                         self.players.push(Player {
