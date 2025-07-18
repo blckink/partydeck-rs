@@ -108,6 +108,12 @@ export CARGO_BUILD_JOBS=4  # Steam Deck Zen 2 cores
 - Aggressive Cache-Bereinigung
 - Sofortige Temp-Cleanup
 
+### Vulkan Headers Fix:
+- Automatische Environment-Setup
+- pkg-config Pfad-Korrektur
+- Missing vulkan-headers Lösung
+- Steam Deck spezifische Include-Pfade
+
 ---
 
 ## 🎯 Use Cases

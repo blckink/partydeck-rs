@@ -202,6 +202,24 @@ install_steam_deck_deps() {
     rustup update stable 2>/dev/null || true
     rustup default stable 2>/dev/null || true
     
+    # Vulkan Headers Fix anwenden
+    print_info "Wende Vulkan Headers Fix an..."
+    if [[ -f "scripts/vulkan_headers_fix.sh" ]]; then
+        bash scripts/vulkan_headers_fix.sh
+        # Lade Vulkan Environment
+        source /tmp/vulkan_env.sh 2>/dev/null || true
+    else
+        # Inline Vulkan Fix
+        export VULKAN_SDK="/usr"
+        export VK_SDK_PATH="/usr"
+        export VULKAN_INCLUDE_DIR="/usr/include/vulkan"
+        export VK_LAYER_PATH="/usr/share/vulkan/explicit_layer.d"
+        export CPATH="/usr/include/vulkan:$CPATH"
+        export C_INCLUDE_PATH="/usr/include/vulkan:$C_INCLUDE_PATH"
+        export CPLUS_INCLUDE_PATH="/usr/include/vulkan:$CPLUS_INCLUDE_PATH"
+        print_info "Vulkan Environment inline gesetzt"
+    fi
+    
     print_success "Steam Deck Dependencies installiert!"
     sleep 1
 }
@@ -258,7 +276,18 @@ build_steam_deck_native() {
     export OPENSSL_DIR=/usr
     export OPENSSL_LIB_DIR=/usr/lib/x86_64-linux-gnu
     export OPENSSL_INCLUDE_DIR=/usr/include/openssl
-    export PKG_CONFIG_PATH=/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH
+    
+    # Vulkan Headers für Steam Deck (FIX für vulkan-headers Fehler)
+    export VULKAN_SDK="/usr"
+    export VK_SDK_PATH="/usr"
+    export VULKAN_INCLUDE_DIR="/usr/include/vulkan"
+    export VK_LAYER_PATH="/usr/share/vulkan/explicit_layer.d"
+    export CPATH="/usr/include/vulkan:$CPATH"
+    export C_INCLUDE_PATH="/usr/include/vulkan:$C_INCLUDE_PATH"
+    export CPLUS_INCLUDE_PATH="/usr/include/vulkan:$CPLUS_INCLUDE_PATH"
+    
+    # PKG_CONFIG_PATH für alle Libraries
+    export PKG_CONFIG_PATH="/usr/lib/x86_64-linux-gnu/pkgconfig:/usr/lib/pkgconfig:/usr/share/pkgconfig:$PKG_CONFIG_PATH"
     
     # Steam Deck spezifische Features aktivieren
     FEATURES="steam-deck-native,multi-mouse,split-screen-4player"
