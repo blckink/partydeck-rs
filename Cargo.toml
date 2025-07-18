@@ -1,7 +1,37 @@
 [package]
-name = "partydeck-rs"
-version = "0.5.2"
+name = "partydeck-rs-steamdeck"
+version = "1.0.0-steamdeck"
 edition = "2024"
+description = "Ultimate Steam Deck Split-Screen Gaming Tool - Native Edition"
+keywords = ["steam-deck", "split-screen", "gaming", "multi-mouse", "steamos"]
+categories = ["games", "multimedia"]
+authors = ["davidawesome02 <davidawesome02@gmail.com>"]
+
+# Steam Deck native optimizations
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+panic = "abort"
+debug = false
+rpath = true
+
+# Steam Deck target-specific optimizations
+[target.'cfg(target_arch = "x86_64")']
+rustflags = [
+    "-C", "target-cpu=znver2",      # AMD Zen 2 (Steam Deck CPU)
+    "-C", "target-feature=+avx2",   # Use AVX2 instructions
+    "-C", "force-frame-pointers=no"
+]
+
+# Steam Deck specific features
+[features]
+default = ["steam-deck-native"]
+steam-deck-native = []
+multi-mouse = []
+split-screen-4player = []
+steam-input-api = []
+gamescope-integration = []
 
 [dependencies]
 compress-tools = "0.15.1"
@@ -24,3 +54,15 @@ zbus = "5.5.0"
 zip = "2.6.1"
 steamlocate = "2.0.1"
 semver = "1.0.26"
+
+# Steam Deck native dependencies
+wayland-client = { version = "0.31", features = ["use_system_lib"] }
+smithy-client-toolkit = "0.19"
+libinput = "0.5.0"
+
+# Performance monitoring for Steam Deck
+sysinfo = "0.32.0"
+
+# Steam Deck hardware detection
+[target.'cfg(target_os = "linux")'.dependencies]
+udev = "0.9.1"
